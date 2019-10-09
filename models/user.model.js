@@ -7,16 +7,16 @@ const CONFIG            = require('../config/config');
 
 module.exports = (sequelize, DataTypes) => {
     var Model = sequelize.define('User', {
-        first     : DataTypes.STRING,
-        last      : DataTypes.STRING,
-        email     : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { isEmail: {msg: "Phone number invalid."} }},
-        phone     : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { len: {args: [7, 20], msg: "Phone number invalid, too short."}, isNumeric: { msg: "not a valid phone number."} }},
-        password  : DataTypes.STRING,
+        first    : DataTypes.STRING,
+        last     : DataTypes.STRING,
+        email    : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { isEmail: {msg: "Phone number invalid."} }},
+        phone    : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { len: {args: [7, 20], msg: "Phone number invalid, too short."}, isNumeric: { msg: "not a valid phone number."} }},
+        password : DataTypes.STRING,
     });
 
-    Model.associate = function(models){
-        this.Companies = this.belongsToMany(models.Company, {through: 'UserCompany'});
-    };
+    // Model.associate = function(models){
+    //     this.Companies = this.belongsToMany(models.Company, {through: 'UserCompany'});
+    // };
 
     Model.beforeSave(async (user, options) => {
         let err;

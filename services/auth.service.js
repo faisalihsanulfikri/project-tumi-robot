@@ -25,6 +25,7 @@ const createUser = async (userInfo) => {
     auth_info.status='create';
 
     unique_key = getUniqueKeyFromBody(userInfo);
+    
     if(!unique_key) TE('An email or phone number was not entered.');
 
     if(validator.isEmail(unique_key)){

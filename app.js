@@ -5,10 +5,14 @@ const passport      = require('passport');
 const pe            = require('parse-error');
 const cors          = require('cors');
 
-const v1    = require('./routes/v1');
+const api    = require('./routes/api');
 const app   = express();
 
 const CONFIG = require('./config/config');
+
+process.env.TZ = 'Asia/Jakarta';
+d = new Date().toLocaleString("en-US", {timeZone: process.env.TZ})
+console.log(d);
 
 app.use(logger('dev'));
 app.use(bodyParser.json());
@@ -21,6 +25,7 @@ app.use(passport.initialize());
 
 //Log Env
 console.log("Environment:", CONFIG.app)
+
 //DATABASE
 const models = require("./models");
 models.sequelize.authenticate().then(() => {
@@ -36,7 +41,7 @@ if(CONFIG.app==='dev'){
 // CORS
 app.use(cors());
 
-app.use('/v1', v1);
+app.use('/api', api);
 
 app.use('/', function(req, res){
 	res.statusCode = 200;//send the appropriate status code

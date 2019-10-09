@@ -5,9 +5,9 @@ module.exports = (sequelize, DataTypes) => {
     name: DataTypes.STRING
   });
 
-  Model.associate = function(models){
-      this.Users = this.belongsToMany(models.User, {through: 'UserCompany'});
-  };
+  // Model.associate = function(models){
+  //     this.Users = this.belongsToMany(models.User, {through: 'UserCompany'});
+  // };
 
   Model.prototype.toWeb = function (pw) {
       let json = this.toJSON();
