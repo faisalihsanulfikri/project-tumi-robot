@@ -2,11 +2,9 @@ const { User }          = require('../models');
 const authService       = require('../services/auth.service');
 const { to, ReE, ReS }  = require('../services/util.service');
 
-const create = async function(req, res){
+// function register user
+const register = async function(req, res){
     const body = req.body;
-
-    console.log(body);
-    
 
     if(!body.unique_key && !body.email && !body.phone){
         return ReE(res, 'Please enter an email or phone number to register.');
@@ -21,19 +19,54 @@ const create = async function(req, res){
         return ReS(res, {message:'Successfully created new user.', user:user.toWeb(), token:user.getJWT()}, 201);
     }
 }
-module.exports.create = create;
+module.exports.register = register;
 
+// function login user
+const login = async function (req, res) {
+    const body = req.body;
+    let err, user;
+
+    [err, user] = await to(authService.authUser(req.body));
+    if (err) return ReE(res, err, 422);
+
+    return ReS(res, { token: user.getJWT(), user: user.toWeb() });
+}
+module.exports.login = login;
+
+// function get user by id
 const get = async function(req, res){
-    let user = req.user;
+    let user, user_id, err;
+    user_id = req.params.user_id;
 
-    return ReS(res, {user:user.toWeb()});
+    [err, user] = await to(User.findOne({ where: { id: user_id } }));
+    if (err) return ReE(res, "err finding user");
+    if (!user) return ReE(res, "user not found with id: " + user_id);
+
+    return ReS(res, { user: user.toWeb() });
 }
 module.exports.get = get;
 
+// function get user all
+const getAll = async function(req, res){
+    let users;
+
+    [err, users] = await to(User.findAll({raw: true}));
+    
+    return ReS(res, { users: users});
+}
+module.exports.getAll = getAll;
+
+// function update user
 const update = async function(req, res){
-    let err, user, data
-    user = req.user;
+    let user, data, user_id, err;
+    user_id = req.params.user_id;
+    
     data = req.body;
+
+    [err, user] = await to(User.findOne({ where: { id: user_id } }));
+    if (err) return ReE(res, "err finding user");
+    if (!user) return ReE(res, "user not found with id: " + user_id);
+
     user.set(data);
 
     [err, user] = await to(user.save());
@@ -45,25 +78,18 @@ const update = async function(req, res){
 }
 module.exports.update = update;
 
+// function remove user
 const remove = async function(req, res){
-    let user, err;
-    user = req.user;
+    let user, user_id, err;
+    user_id = req.params.user_id;
+
+    [err, user] = await to(User.findOne({ where: { id: user_id } }));
+    if (err) return ReE(res, "err finding user");
+    if (!user) return ReE(res, "user not found with id: " + user_id);
 
     [err, user] = await to(user.destroy());
     if(err) return ReE(res, 'error occured trying to delete user');
 
-    return ReS(res, {message:'Deleted User'}, 204);
+    return ReS(res, {message :'Deleted User'});
 }
 module.exports.remove = remove;
-
-
-const login = async function(req, res){
-    const body = req.body;
-    let err, user;
-
-    [err, user] = await to(authService.authUser(req.body));
-    if(err) return ReE(res, err, 422);
-
-    return ReS(res, {token:user.getJWT(), user:user.toWeb()});
-}
-module.exports.login = login;

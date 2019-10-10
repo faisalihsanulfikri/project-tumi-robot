@@ -21,6 +21,8 @@ module.exports.getUniqueKeyFromBody = getUniqueKeyFromBody;
 const createUser = async (userInfo) => {
     let unique_key, auth_info, err;
 
+    // console.log(userInfo);
+
     auth_info={};
     auth_info.status='create';
 
@@ -31,6 +33,8 @@ const createUser = async (userInfo) => {
     if(validator.isEmail(unique_key)){
         auth_info.method = 'email';
         userInfo.email = unique_key;
+
+        console.log(userInfo);
 
         [err, user] = await to(User.create(userInfo));
         if(err) TE('user already exists with that email');
@@ -48,6 +52,9 @@ const createUser = async (userInfo) => {
     }else{
         TE('A valid email or phone number was not entered.');
     }
+
+    
+    
 }
 module.exports.createUser = createUser;
 

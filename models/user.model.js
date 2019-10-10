@@ -12,11 +12,12 @@ module.exports = (sequelize, DataTypes) => {
         email    : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { isEmail: {msg: "Phone number invalid."} }},
         phone    : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { len: {args: [7, 20], msg: "Phone number invalid, too short."}, isNumeric: { msg: "not a valid phone number."} }},
         password : DataTypes.STRING,
+        level    : DataTypes.STRING,
     });
 
-    // Model.associate = function(models){
-    //     this.Companies = this.belongsToMany(models.Company, {through: 'UserCompany'});
-    // };
+    Model.associate = function(models){
+        // associations can be defined here
+    };
 
     Model.beforeSave(async (user, options) => {
         let err;
@@ -46,7 +47,7 @@ module.exports = (sequelize, DataTypes) => {
 
     Model.prototype.getJWT = function () {
         let expiration_time = parseInt(CONFIG.jwt_expiration);
-        return "Bearer "+jwt.sign({user_id:this.id}, CONFIG.jwt_encryption, {expiresIn: expiration_time});
+        return "Bearer "+jwt.sign({user_id:this.id, user_level:this.level}, CONFIG.jwt_encryption, {expiresIn: expiration_time});
     };
 
     Model.prototype.toWeb = function (pw) {
