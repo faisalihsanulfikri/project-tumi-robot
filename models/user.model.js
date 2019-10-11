@@ -13,6 +13,7 @@ module.exports = (sequelize, DataTypes) => {
         phone    : {type: DataTypes.STRING, allowNull: true, unique: true, validate: { len: {args: [7, 20], msg: "Phone number invalid, too short."}, isNumeric: { msg: "not a valid phone number."} }},
         password : DataTypes.STRING,
         level    : DataTypes.STRING,
+        active   : DataTypes.STRING,
     });
 
     Model.associate = function(models){

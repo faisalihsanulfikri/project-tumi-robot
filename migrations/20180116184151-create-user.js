@@ -25,7 +25,9 @@ module.exports = {
       },
       level: {
           type: Sequelize.STRING,
-          unique : true,
+      },
+      active: {
+          type: Sequelize.STRING,
       },
       createdAt: {
         allowNull: false,
