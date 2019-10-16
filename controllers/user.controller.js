@@ -1,5 +1,6 @@
 const { User } = require("../models");
 const { Security } = require("../models");
+const { Robot } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 
@@ -8,28 +9,24 @@ const register = async function(req, res) {
   const body = req.body;
   let userData = {};
 
-  var d = new Date().toLocaleString();
-  (month = "" + (d.getMonth() + 1)),
-    (day = "" + d.getDate()),
-    (year = d.getFullYear());
+  let d = new Date();
+  let month = d.getMonth() + 1;
+  let day = d.getDate();
+  let year = d.getFullYear();
+  let hour = d.getHours();
+  let minute = d.getMinutes();
+  let second = d.getSeconds();
 
   if (month.length < 2) month = "0" + month;
   if (day.length < 2) day = "0" + day;
 
-  return [year, month, day].join("-");
+  let date =
+    year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
 
-  return ReS(
-    res,
-    {
-      data: date
-    },
-    201
-  );
-
-  userData.username = body.username;
-  userData.email = body.email;
-  userData.phone = body.phone;
-  userData.register_date = "0";
+  userData.username = body.user.username;
+  userData.email = body.user.email;
+  userData.phone = body.user.phone;
+  userData.register_date = date;
   userData.status = "pending";
   userData.level = "1";
   userData.password = "8888";
@@ -43,18 +40,24 @@ const register = async function(req, res) {
   } else {
     let err, user;
 
-    // [err, user] = await to(authService.createUser(userData));
+    [err, user] = await to(authService.createUser(userData));
 
     if (err) return ReE(res, err, 422);
 
-    let security_info = {};
-    security_info.userId = user.id;
-    security_info.securityName = body.securityName;
-    security_info.securityUserId = body.securityUserId;
-    security_info.securityPassword = body.securityPassword;
-    security_info.securityPin = body.securityPin;
+    let securityData = {};
+    securityData.username = body.security.username;
+    securityData.password = body.security.password;
+    securityData.pin = body.security.pin;
 
-    // [err, security] = await to(Security.create(security_info));
+    [err, security] = await to(Security.create(securityData));
+    if (err) return ReE(res, err, 422);
+
+    let robotData = {};
+    robotData.user_id = user.id;
+    robotData.security_id = security.id;
+    robotData.status = "off";
+
+    [err, robot] = await to(Robot.create(robotData));
     if (err) return ReE(res, err, 422);
 
     return ReS(

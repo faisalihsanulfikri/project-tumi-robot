@@ -1,13 +1,15 @@
 "use strict";
 module.exports = (sequelize, DataTypes) => {
-  var Model = sequelize.define("Security", {
-    username: DataTypes.STRING,
-    password: DataTypes.STRING,
-    pin: DataTypes.STRING,
-    active_date: DataTypes.DATE,
-    expire_date: DataTypes.DATE
-  });
-
+  var Model = sequelize.define(
+    "Robot",
+    {
+      user_id: DataTypes.INTEGER,
+      security_id: DataTypes.INTEGER,
+      status: DataTypes.STRING,
+      off_message: DataTypes.STRING
+    },
+    {}
+  );
   Model.associate = function(models) {
     // associations can be defined here
   };
