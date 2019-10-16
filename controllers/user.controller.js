@@ -117,7 +117,7 @@ const change_password = async function(req, res){
 
     [err, user] = await to(User.findOne({ where: { id: user_id } }));
     if (err) return ReE(res, "err finding user");
-    if (!user) return ReE(res, "user not found with id: " + user_id);
+    if (!user) return ReE(res, "user not found with id: " + user_id, 422);
 
     user.set(data);
 
