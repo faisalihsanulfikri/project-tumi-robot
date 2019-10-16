@@ -8,7 +8,7 @@ module.exports = {
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      name: {
+      username: {
         type: Sequelize.STRING
       },
       email: {
@@ -20,17 +20,23 @@ module.exports = {
         type: Sequelize.STRING,
         unique: true
       },
+      register_date: {
+        type: Sequelize.DATE
+      },
       level: {
         type: Sequelize.STRING
       },
-      active: {
+      status: {
         type: Sequelize.STRING
       },
-      createdAt: {
+      reset_token: {
+        type: Sequelize.STRING
+      },
+      created_at: {
         allowNull: false,
         type: Sequelize.DATE
       },
-      updatedAt: {
+      updated_at: {
         allowNull: false,
         type: Sequelize.DATE
       }

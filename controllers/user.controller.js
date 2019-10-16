@@ -1,33 +1,68 @@
 const { User } = require("../models");
+const { Security } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 
 // function register user
 const register = async function(req, res) {
   const body = req.body;
+  let userData = {};
 
-  body.active = "0";
-  body.level = "1";
-  body.password = "8888";
+  var d = new Date().toLocaleString();
+  (month = "" + (d.getMonth() + 1)),
+    (day = "" + d.getDate()),
+    (year = d.getFullYear());
 
-  if (!body.unique_key && !body.email) {
+  if (month.length < 2) month = "0" + month;
+  if (day.length < 2) day = "0" + day;
+
+  return [year, month, day].join("-");
+
+  return ReS(
+    res,
+    {
+      data: date
+    },
+    201
+  );
+
+  userData.username = body.username;
+  userData.email = body.email;
+  userData.phone = body.phone;
+  userData.register_date = "0";
+  userData.status = "pending";
+  userData.level = "1";
+  userData.password = "8888";
+
+  if (!userData.unique_key && !userData.email) {
     return ReE(res, "Please enter an email to register.", 422);
-  } else if (!body.phone) {
+  } else if (!userData.phone) {
     return ReE(res, "Please enter a phone number to register.", 422);
-  } else if (!body.password) {
+  } else if (!userData.password) {
     return ReE(res, "Please enter a password to register.", 422);
   } else {
     let err, user;
 
-    [err, user] = await to(authService.createUser(body));
+    // [err, user] = await to(authService.createUser(userData));
 
     if (err) return ReE(res, err, 422);
+
+    let security_info = {};
+    security_info.userId = user.id;
+    security_info.securityName = body.securityName;
+    security_info.securityUserId = body.securityUserId;
+    security_info.securityPassword = body.securityPassword;
+    security_info.securityPin = body.securityPin;
+
+    // [err, security] = await to(Security.create(security_info));
+    if (err) return ReE(res, err, 422);
+
     return ReS(
       res,
       {
         message: "Successfully created new user.",
         user: user.toWeb(),
-        token: user.getJWT()
+        access_token: user.getJWT()
       },
       201
     );

@@ -7,7 +7,7 @@ const CONFIG = require("../config/config");
 
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define("User", {
-    name: DataTypes.STRING,
+    username: DataTypes.STRING,
     email: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -24,8 +24,10 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     password: DataTypes.STRING,
+    register_date: DataTypes.DATE,
     level: DataTypes.STRING,
-    active: DataTypes.STRING
+    status: DataTypes.STRING,
+    reset_token: DataTypes.STRING
   });
 
   Model.associate = function(models) {
