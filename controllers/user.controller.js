@@ -33,47 +33,62 @@ const register = async function(req, res) {
   userData.level = "1";
   userData.password = "8888";
 
+  // security data
+  let securityData = {};
+  securityData.username = body.security.username;
+  securityData.password = body.security.password;
+  securityData.pin = body.security.pin;
+
+  // validation
   if (!userData.unique_key && !userData.email) {
     return ReE(res, "Please enter an email to register.", 422);
-  } else if (!userData.phone) {
-    return ReE(res, "Please enter a phone number to register.", 422);
-  } else if (!userData.password) {
-    return ReE(res, "Please enter a password to register.", 422);
-  } else {
-    let err, user;
-
-    [err, user] = await to(authService.createUser(userData));
-
-    if (err) return ReE(res, err, 422);
-
-    // security data
-    let securityData = {};
-    securityData.username = body.security.username;
-    securityData.password = body.security.password;
-    securityData.pin = body.security.pin;
-
-    [err, security] = await to(Security.create(securityData));
-    if (err) return ReE(res, err, 422);
-
-    // robot data
-    let robotData = {};
-    robotData.user_id = user.id;
-    robotData.security_id = security.id;
-    robotData.status = "off";
-
-    [err, robot] = await to(Robot.create(robotData));
-    if (err) return ReE(res, err, 422);
-
-    return ReS(
-      res,
-      {
-        message: "Successfully created new user.",
-        user: user.toWeb(),
-        access_token: user.getJWT()
-      },
-      201
-    );
   }
+  if (!userData.phone) {
+    return ReE(res, "Please enter a phone number to register.", 422);
+  }
+  if (!userData.password) {
+    return ReE(res, "Please enter a password to register.", 422);
+  }
+  if (!userData.username) {
+    return ReE(res, "Please enter a name to register.", 422);
+  }
+  if (!securityData.username) {
+    return ReE(res, "Please enter a security name to register.", 422);
+  }
+  if (!securityData.password) {
+    return ReE(res, "Please enter a security password to register.", 422);
+  }
+  if (!securityData.pin) {
+    return ReE(res, "Please enter a security pin to register.", 422);
+  }
+
+  // insert to db user
+  let err, user;
+  [err, user] = await to(authService.createUser(userData));
+  if (err) return ReE(res, err, 422);
+
+  // insert to db security
+  let err, security;
+  [err, security] = await to(Security.create(securityData));
+  if (err) return ReE(res, err, 422);
+
+  // robot data
+  let err, robot;
+  let robotData = {};
+  robotData.user_id = user.id;
+  robotData.security_id = security.id;
+  robotData.status = "off";
+
+  [err, robot] = await to(Robot.create(robotData));
+  if (err) return ReE(res, err, 422);
+
+  return ReS(
+    res,
+    {
+      message: "Successfully created new user."
+    },
+    201
+  );
 };
 module.exports.register = register;
 
