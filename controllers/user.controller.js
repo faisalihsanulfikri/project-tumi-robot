@@ -1,6 +1,7 @@
 const { User } = require("../models");
 const { Security } = require("../models");
 const { Robot } = require("../models");
+const Mailgun = require("mailgun-js");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 
@@ -40,28 +41,32 @@ const register = async function(req, res) {
   securityData.pin = body.security.pin;
 
   if (!userData.unique_key && !userData.email) {
-    return ReE(res, "Please enter an email to register.", 422);
+    return ReE(res, "Silakan masukkan email untuk mendaftar.", 422);
   }
   if (!userData.phone) {
-    return ReE(res, "Please enter a phone number to register.", 422);
+    return ReE(res, "Silakan masukkan nomor telepon untuk mendaftar.", 422);
   }
   if (userData.phone.length < 11 || userData.phone.length > 12) {
-    return ReE(res, "Invalid format phone number.", 422);
+    return ReE(res, "Format nomor telepon tidak valid.", 422);
   }
   if (!userData.password) {
-    return ReE(res, "Please enter a password to register.", 422);
+    return ReE(res, "Silakan masukkan password untuk mendaftar.", 422);
   }
   if (!userData.username) {
-    return ReE(res, "Please enter a name to register.", 422);
+    return ReE(res, "Silakan masukkan nama lengkap untuk mendaftar.", 422);
   }
   if (!securityData.username) {
-    return ReE(res, "Please enter a security name to register.", 422);
+    return ReE(res, "Silakan masukkan nama sekuritas untuk mendaftar.", 422);
   }
   if (!securityData.password) {
-    return ReE(res, "Please enter a security password to register.", 422);
+    return ReE(
+      res,
+      "Silakan masukkan password sekuritas untuk mendaftar.",
+      422
+    );
   }
   if (!securityData.pin) {
-    return ReE(res, "Please enter a security pin to register.", 422);
+    return ReE(res, "Silakan masukkan pin sekuritas untuk mendaftar.", 422);
   }
 
   let err, user, security, robot;
@@ -86,7 +91,7 @@ const register = async function(req, res) {
   return ReS(
     res,
     {
-      message: "Successfully created new user."
+      message: "Berhasil membuat akun baru. Silakan mengecek email anda."
     },
     201
   );
@@ -111,8 +116,9 @@ const get = async function(req, res) {
   user_id = req.params.user_id;
 
   [err, user] = await to(User.findOne({ where: { id: user_id } }));
-  if (err) return ReE(res, "err finding user", 422);
-  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
 
   return ReS(res, { user: user.toWeb() });
 };
@@ -136,18 +142,19 @@ const update = async function(req, res) {
   data = req.body;
 
   [err, user] = await to(User.findOne({ where: { id: user_id } }));
-  if (err) return ReE(res, "err finding user", 422);
-  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
 
   user.set(data);
 
   [err, user] = await to(user.save());
   if (err) {
     if (err.message == "Validation error")
-      err = "The email address or phone number is already in use";
+      err = "Alamat email atau nomor telepon sudah digunakan";
     return ReE(res, err, 422);
   }
-  return ReS(res, { message: "Updated User: " + user.email });
+  return ReS(res, { message: "User diperbaharui: " + user.email });
 };
 module.exports.update = update;
 
@@ -157,12 +164,45 @@ const remove = async function(req, res) {
   user_id = req.params.user_id;
 
   [err, user] = await to(User.findOne({ where: { id: user_id } }));
-  if (err) return ReE(res, "err finding user", 422);
-  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
 
   [err, user] = await to(user.destroy());
-  if (err) return ReE(res, "error occured trying to delete user", 422);
+  if (err) return ReE(res, "User gagal dihapus", 422);
 
-  return ReS(res, { message: "Deleted User" });
+  return ReS(res, { message: "User terhapus" });
 };
 module.exports.remove = remove;
+
+// const email = async function(req, res) {
+//   let api_key = process.env.MAIL_GUN_API_KEY;
+//   let domain = process.env.MAIL_GUN_DOMAIN;
+//   let tumi_email = process.env.MAIL_GUN_MAIL;
+
+//   let mailgun = new Mailgun({ apiKey: api_key, domain: domain });
+//   let data = {
+//     from: tumi_email,
+//     to: "faisalihsanulfikri.gmail.com",
+//     subject: "Hello from Mailgun",
+//     html:
+//       "Hello, This is not a plain-text email, I wanted to test some spicy Mailgun sauce in NodeJS!"
+//   };
+
+//   mailgun.messages().send(data, function(err, body) {
+//     if (err) {
+//       ReS(res, {
+//         error: err
+//       });
+
+//       console.log("got an error: ", err);
+//     } else {
+//       ReS(res, {
+//         email: "faisalihsanulfikri.gmail.com"
+//       });
+
+//       console.log(body);
+//     }
+//   });
+// };
+// module.exports.email = email;
