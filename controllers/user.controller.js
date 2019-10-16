@@ -1,4 +1,6 @@
 const { User } = require("../models");
+const { Security } = require("../models");
+const { Robot } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 
@@ -6,28 +8,68 @@ const { to, ReE, ReS } = require("../services/util.service");
 const register = async function(req, res) {
   const body = req.body;
 
-  body.active = "0";
-  body.level = "1";
-  body.password = "8888";
+  // date
+  let d = new Date();
+  let month = d.getMonth() + 1;
+  let day = d.getDate();
+  let year = d.getFullYear();
+  let hour = d.getHours();
+  let minute = d.getMinutes();
+  let second = d.getSeconds();
 
-  if (!body.unique_key && !body.email) {
+  if (month.length < 2) month = "0" + month;
+  if (day.length < 2) day = "0" + day;
+
+  let date =
+    year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
+
+  // user data
+  let userData = {};
+  userData.username = body.user.username;
+  userData.email = body.user.email;
+  userData.phone = body.user.phone;
+  userData.register_date = date;
+  userData.status = "pending";
+  userData.level = "1";
+  userData.password = "8888";
+
+  if (!userData.unique_key && !userData.email) {
     return ReE(res, "Please enter an email to register.", 422);
-  } else if (!body.phone) {
+  } else if (!userData.phone) {
     return ReE(res, "Please enter a phone number to register.", 422);
-  } else if (!body.password) {
+  } else if (!userData.password) {
     return ReE(res, "Please enter a password to register.", 422);
   } else {
     let err, user;
 
-    [err, user] = await to(authService.createUser(body));
+    [err, user] = await to(authService.createUser(userData));
 
     if (err) return ReE(res, err, 422);
+
+    // security data
+    let securityData = {};
+    securityData.username = body.security.username;
+    securityData.password = body.security.password;
+    securityData.pin = body.security.pin;
+
+    [err, security] = await to(Security.create(securityData));
+    if (err) return ReE(res, err, 422);
+
+    // robot data
+    let robotData = {};
+    robotData.user_id = user.id;
+    robotData.security_id = security.id;
+    robotData.status = "off";
+
+    [err, robot] = await to(Robot.create(robotData));
+    if (err) return ReE(res, err, 422);
+
     return ReS(
       res,
       {
         message: "Successfully created new user.",
         user: user.toWeb(),
-        token: user.getJWT()
+        access_token: user.getJWT()
       },
       201
     );
