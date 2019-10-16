@@ -39,12 +39,14 @@ const register = async function(req, res) {
   securityData.password = body.security.password;
   securityData.pin = body.security.pin;
 
-  // validation
   if (!userData.unique_key && !userData.email) {
     return ReE(res, "Please enter an email to register.", 422);
   }
   if (!userData.phone) {
     return ReE(res, "Please enter a phone number to register.", 422);
+  }
+  if (userData.phone.length < 11 || userData.phone.length > 12) {
+    return ReE(res, "Invalid format phone number.", 422);
   }
   if (!userData.password) {
     return ReE(res, "Please enter a password to register.", 422);
@@ -62,18 +64,17 @@ const register = async function(req, res) {
     return ReE(res, "Please enter a security pin to register.", 422);
   }
 
+  let err, user, security, robot;
+
   // insert to db user
-  let err, user;
   [err, user] = await to(authService.createUser(userData));
   if (err) return ReE(res, err, 422);
 
   // insert to db security
-  let err, security;
   [err, security] = await to(Security.create(securityData));
   if (err) return ReE(res, err, 422);
 
   // robot data
-  let err, robot;
   let robotData = {};
   robotData.user_id = user.id;
   robotData.security_id = security.id;
