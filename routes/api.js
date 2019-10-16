@@ -22,6 +22,7 @@ router.post(    '/users',           UserController.create);                     
 router.get(     '/users',           passport.authenticate('jwt', {session:false}), UserController.get);        // R
 router.put(     '/users',           passport.authenticate('jwt', {session:false}), UserController.update);     // U
 router.delete(  '/users',           passport.authenticate('jwt', {session:false}), UserController.remove);     // D
+router.put(     '/change/:user_id',   UserController.change_password);
 router.post(    '/users/login',     UserController.login);
 
 router.post(    '/companies',             passport.authenticate('jwt', {session:false}), CompanyController.create);                  // C

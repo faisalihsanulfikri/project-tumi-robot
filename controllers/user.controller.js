@@ -67,3 +67,20 @@ const login = async function(req, res){
     return ReS(res, {token:user.getJWT(), user:user.toWeb()});
 }
 module.exports.login = login;
+
+const change_password = async function(req, res){
+    let user, data, user_id, err;
+    user_id = req.params.user_id;
+    
+    data = req.body;
+
+    [err, user] = await to(User.findOne({ where: { id: user_id } }));
+    if (err) return ReE(res, "err finding user");
+    if (!user) return ReE(res, "user not found with id: " + user_id);
+
+    user.set(data);
+
+    [err, user] = await to(user.save());
+    return ReS(res, {message :'change Password: '+user.password});
+}
+module.exports.change_password = change_password;
