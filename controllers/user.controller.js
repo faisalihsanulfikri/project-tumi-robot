@@ -1,6 +1,7 @@
 const { User } = require("../models");
 const { Security } = require("../models");
 const { Robot } = require("../models");
+const Mailgun = require("mailgun-js");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 
@@ -150,3 +151,35 @@ const remove = async function(req, res) {
   return ReS(res, { message: "Deleted User" });
 };
 module.exports.remove = remove;
+
+const email = async function(req, res) {
+  let api_key = process.env.MAIL_GUN_API_KEY;
+  let domain = process.env.MAIL_GUN_DOMAIN;
+  let tumi_email = process.env.MAIL_GUN_MAIL;
+
+  let mailgun = new Mailgun({ apiKey: api_key, domain: domain });
+  let data = {
+    from: tumi_email,
+    to: "faisalihsanulfikri.gmail.com",
+    subject: "Hello from Mailgun",
+    html:
+      "Hello, This is not a plain-text email, I wanted to test some spicy Mailgun sauce in NodeJS!"
+  };
+
+  mailgun.messages().send(data, function(err, body) {
+    if (err) {
+      ReS(res, {
+        error: err
+      });
+
+      console.log("got an error: ", err);
+    } else {
+      ReS(res, {
+        email: "faisalihsanulfikri.gmail.com"
+      });
+
+      console.log(body);
+    }
+  });
+};
+module.exports.email = email;
