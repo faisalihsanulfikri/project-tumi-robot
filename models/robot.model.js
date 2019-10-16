@@ -11,7 +11,14 @@ module.exports = (sequelize, DataTypes) => {
     {}
   );
   Model.associate = function(models) {
-    // associations can be defined here
+    Model.belongsTo(models.User, {
+      foreignKey: "user_id",
+      as: "users"
+    });
+    Model.belongsTo(models.Security, {
+      foreignKey: "security_id",
+      as: "securities"
+    });
   };
 
   Model.prototype.toWeb = function(pw) {

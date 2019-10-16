@@ -7,8 +7,8 @@ const { to, ReE, ReS } = require("../services/util.service");
 // function register user
 const register = async function(req, res) {
   const body = req.body;
-  let userData = {};
 
+  // date
   let d = new Date();
   let month = d.getMonth() + 1;
   let day = d.getDate();
@@ -23,6 +23,8 @@ const register = async function(req, res) {
   let date =
     year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
 
+  // user data
+  let userData = {};
   userData.username = body.user.username;
   userData.email = body.user.email;
   userData.phone = body.user.phone;
@@ -44,6 +46,7 @@ const register = async function(req, res) {
 
     if (err) return ReE(res, err, 422);
 
+    // security data
     let securityData = {};
     securityData.username = body.security.username;
     securityData.password = body.security.password;
@@ -52,6 +55,7 @@ const register = async function(req, res) {
     [err, security] = await to(Security.create(securityData));
     if (err) return ReE(res, err, 422);
 
+    // robot data
     let robotData = {};
     robotData.user_id = user.id;
     robotData.security_id = security.id;
