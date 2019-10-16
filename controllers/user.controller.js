@@ -43,7 +43,7 @@ const login = async function(req, res) {
   [err, user] = await to(authService.authUser(body));
   if (err) return ReE(res, err, 422);
 
-  return ReS(res, { token: user.getJWT(), user: user.toWeb() });
+  return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
 };
 module.exports.login = login;
 
