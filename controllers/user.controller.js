@@ -106,7 +106,15 @@ const login = async function(req, res) {
   [err, user] = await to(authService.authUser(body));
   if (err) return ReE(res, err, 422);
 
-  return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  if (user.status == "active") {
+    return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  } else {
+    return ReE(
+      res,
+      "Akun anda belum aktif, mohon menunggu pemberitahuan lebih lanjut yang akan disampaikan melalui email.",
+      422
+    );
+  }
 };
 module.exports.login = login;
 
