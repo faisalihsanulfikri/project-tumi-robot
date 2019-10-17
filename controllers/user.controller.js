@@ -184,33 +184,31 @@ const remove = async function(req, res) {
 module.exports.remove = remove;
 
 const email = async function(req, res) {
-  let api_key = process.env.MAIL_GUN_API_KEY;
-  let domain = process.env.MAIL_GUN_DOMAIN;
-  let tumi_email = process.env.MAIL_GUN_MAIL;
+  var API_KEY = process.env.MAIL_GUN_API_KEY;
+  var DOMAIN = process.env.MAIL_GUN_DOMAIN;
 
-  let mailgun = new Mailgun({ apiKey: api_key, domain: domain });
-  let data = {
-    from: tumi_email,
-    to: "faisalihsanulfikri.gmail.com",
-    subject: "Hello from Mailgun",
-    html:
-      "Hello, This is not a plain-text email, I wanted to test some spicy Mailgun sauce in NodeJS!"
+  // const data = {
+  //   from: process.env.MAIL_GUN_MAIL,
+  //   to: "faisalihsanulfikri@gmail.com",
+  //   subject: "Hello",
+  //   template: "user_registration",
+  //   "h:X-Mailgun-Variables": { test: "test" }
+  // };
+
+  // mailgun.messages().send(data, (error, body) => {
+  //   console.log(body);
+  // });
+
+  const mailgun = require("mailgun-js");
+  const mg = mailgun({ apiKey: API_KEY, domain: DOMAIN });
+  const data = {
+    from: "Admin Robot Tumi <postmaster@tumi.com>",
+    to: "faisalihsanulfikri@gmail.com",
+    subject: "Hello",
+    template: "user_registration"
   };
-
-  mailgun.messages().send(data, function(err, body) {
-    if (err) {
-      ReS(res, {
-        error: err
-      });
-
-      console.log("got an error: ", err);
-    } else {
-      ReS(res, {
-        email: "faisalihsanulfikri.gmail.com"
-      });
-
-      console.log(body);
-    }
+  mg.messages().send(data, function(error, body) {
+    console.log(body);
   });
 };
 module.exports.email = email;
