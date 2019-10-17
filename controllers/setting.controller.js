@@ -1,5 +1,5 @@
-const { Security } = require("../models");
-const { Robot } = require("../models");
+const { master_setting } = require("../models");
+const { users_setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
 // function create security
@@ -23,15 +23,19 @@ module.exports.create = async function(req, res) {
 
 // function get security by id
 module.exports.get = async function(req, res) {
-  let security, security_id, err;
-  security_id = req.params.security_id;
+  let setting, setting_id, err;
+  setting_id = req.params.setting_id;
 
-  [err, security] = await to(Security.findOne({ where: { id: security_id } }));
+  [err, setting] = await to(
+    master_setting.findOne({ where: { id: setting_id } })
+  );
   if (err) return ReE(res, "Sekuritas tidak ditemukan");
-  if (!security)
-    return ReE(res, "Sekuritas dengan id: " + security_id + " tidak ditemukan");
+  if (!setting)
+    return ReE(res, "Sekuritas dengan id: " + setting_id + " tidak ditemukan");
 
-  return ReS(res, { security: security.toWeb() });
+  setting.config_value = JSON.parse(setting.config_value);
+
+  return ReS(res, { setting: setting.toWeb() });
 };
 
 // function get security by user id

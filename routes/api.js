@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const SecurityController = require("../controllers/security.controller");
+const SettingController = require("../controllers/setting.controller");
 const UserController = require("../controllers/user.controller");
 
 const custom = require("./../middleware/custom");
@@ -81,6 +82,40 @@ router.delete(
   "/securities/:security_id",
   passport.authenticate("jwt", { session: false }),
   SecurityController.remove
+);
+
+/**
+ * Setting
+ */
+router.post(
+  "/settings",
+  passport.authenticate("jwt", { session: false }),
+  SettingController.create
+);
+router.get(
+  "/settings",
+  passport.authenticate("jwt", { session: false }),
+  SettingController.getAll
+);
+router.get(
+  "/settings/:setting_id",
+  // passport.authenticate("jwt", { session: false }),
+  SettingController.get
+);
+router.get(
+  "/settings/user/:user_id",
+  passport.authenticate("jwt", { session: false }),
+  SettingController.getByUserId
+);
+router.put(
+  "/settings/:setting_id",
+  passport.authenticate("jwt", { session: false }),
+  SettingController.update
+);
+router.delete(
+  "/settings/:setting_id",
+  passport.authenticate("jwt", { session: false }),
+  SettingController.remove
 );
 
 //********* API DOCUMENTATION **********
