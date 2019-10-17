@@ -1,7 +1,6 @@
 const { User } = require("../models");
 const { Security } = require("../models");
 const { Robot } = require("../models");
-const Mailgun = require("mailgun-js");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 const pug = require("pug");
