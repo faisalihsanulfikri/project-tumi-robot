@@ -3,41 +3,36 @@ const { Security } = require("../models");
 const { Robot } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
+const pug = require("pug");
+const mailgun = require("mailgun-js");
+const moment = require("moment");
+
+const API_KEY = process.env.MAIL_GUN_API_KEY;
+const DOMAIN = process.env.MAIL_GUN_DOMAIN;
 
 // function register user
-const register = async function(req, res) {
+module.exports.register = async function(req, res) {
   const body = req.body;
-
-  // date
-  let d = new Date();
-  let month = d.getMonth() + 1;
-  let day = d.getDate();
-  let year = d.getFullYear();
-  let hour = d.getHours();
-  let minute = d.getMinutes();
-  let second = d.getSeconds();
-
-  if (month.length < 2) month = "0" + month;
-  if (day.length < 2) day = "0" + day;
-
-  let date =
-    year + "-" + month + "-" + day + " " + hour + ":" + minute + ":" + second;
 
   // user data
   let userData = {};
   userData.username = body.user.username;
   userData.email = body.user.email;
   userData.phone = body.user.phone;
-  userData.register_date = date;
+  userData.register_date = moment().format("YYYY-MM-DD H:mm:ss");
   userData.status = "pending";
   userData.level = "1";
   userData.password = "8888";
+  userData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
+  userData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
 
   // security data
   let securityData = {};
   securityData.username = body.security.username;
   securityData.password = body.security.password;
   securityData.pin = body.security.pin;
+  securityData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
+  securityData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
 
   if (!userData.unique_key && !userData.email) {
     return ReE(res, "Silakan masukkan email untuk mendaftar.", 422);
@@ -83,9 +78,14 @@ const register = async function(req, res) {
   robotData.user_id = user.id;
   robotData.security_id = security.id;
   robotData.status = "off";
+  robotData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
+  robotData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
 
   [err, robot] = await to(Robot.create(robotData));
   if (err) return ReE(res, err, 422);
+
+  // send user registration email
+  exports.userRegistrationEmail(user.email);
 
   return ReS(
     res,
@@ -95,22 +95,28 @@ const register = async function(req, res) {
     201
   );
 };
-module.exports.register = register;
 
 // function login user
-const login = async function(req, res) {
+module.exports.login = async function(req, res) {
   const body = req.body;
   let err, user;
 
   [err, user] = await to(authService.authUser(body));
   if (err) return ReE(res, err, 422);
 
-  return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  if (user.status == "active") {
+    return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  } else {
+    return ReE(
+      res,
+      "Akun anda belum aktif, mohon menunggu pemberitahuan lebih lanjut yang akan disampaikan melalui email.",
+      422
+    );
+  }
 };
-module.exports.login = login;
 
 // function get user by id
-const get = async function(req, res) {
+module.exports.get = async function(req, res) {
   let user, user_id, err;
   user_id = req.params.user_id;
 
@@ -121,20 +127,18 @@ const get = async function(req, res) {
 
   return ReS(res, { user: user.toWeb() });
 };
-module.exports.get = get;
 
 // function get user all
-const getAll = async function(req, res) {
+module.exports.getAll = async function(req, res) {
   let users;
 
   [err, users] = await to(User.findAll({ raw: true }));
 
   return ReS(res, { users: users });
 };
-module.exports.getAll = getAll;
 
 // function update user
-const update = async function(req, res) {
+module.exports.update = async function(req, res) {
   let user, data, user_id, err;
   user_id = req.params.user_id;
 
@@ -155,10 +159,9 @@ const update = async function(req, res) {
   }
   return ReS(res, { message: "User diperbaharui: " + user.email });
 };
-module.exports.update = update;
 
 // function remove user
-const remove = async function(req, res) {
+module.exports.remove = async function(req, res) {
   let user, user_id, err;
   user_id = req.params.user_id;
 
@@ -172,4 +175,15 @@ const remove = async function(req, res) {
 
   return ReS(res, { message: "User terhapus" });
 };
-module.exports.remove = remove;
+
+// email user registration
+module.exports.userRegistrationEmail = async function(email) {
+  const mg = mailgun({ apiKey: API_KEY, domain: DOMAIN });
+  const data = {
+    from: "Admin Robot Tumi <admin@robottradingsaham.com>",
+    to: email,
+    subject: "User Registration",
+    html: pug.renderFile("./views/mail/user_registration.pug")
+  };
+  mg.messages().send(data, function(error, body) {});
+};
