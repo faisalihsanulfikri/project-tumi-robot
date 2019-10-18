@@ -2,6 +2,9 @@ const { User } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 
+const API_KEY = process.env.MAIL_GUN_API_KEY;
+const DOMAIN = process.env.MAIL_GUN_DOMAIN;
+
 // function register user
 const register = async function(req, res) {
   const body = req.body;
@@ -113,22 +116,18 @@ module.exports.remove = remove;
 const reset_password = async function(req, res) {
 
     let user, email, err;
-    email = req.params.email;
+    email = req.body.email;
   
     [err, user] = await to(User.findOne({ where: { email: email } }));
     if (err) return ReE(res, "err finding user", 422);
 
-    const api_key = "16ee2b921cf3dd09a660928479d6465c";
-    const domain = "webhade.com";
-    const mail = "TUMI@gmail.com";
-
-    const mailgun = require('mailgun-js')({apiKey: api_key, domain: domain});
+    const mailgun = require('mailgun-js')({apiKey: API_KEY, domain: DOMAIN});
     
     const data = {
-      from: mail,
+      from: "Admin Robot Tumi <admin@robottradingsaham.com>",
       to: email,
-      subject: 'Hello',
-      text: 'Testing some Mailgun awesomeness!'
+      subject: "User Reset Password",
+      html: pug.renderFile("./views/mail/user_registration.pug")
     };
     
     mailgun.messages().send(data, function (error,body) {
