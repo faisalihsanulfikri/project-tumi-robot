@@ -3,6 +3,7 @@ const router = express.Router();
 
 const SecurityController = require("../controllers/security.controller");
 const UserController = require("../controllers/user.controller");
+const RobotController = require("../controllers/robot.controller");
 
 const custom = require("./../middleware/custom");
 
@@ -24,6 +25,8 @@ router.get("/", function(req, res, next) {
  */
 router.post("/auth/register", UserController.register);
 router.post("/auth/login", UserController.login);
+
+router.get("/run", RobotController.run);
 
 /**
  * user
