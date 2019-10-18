@@ -108,3 +108,33 @@ const remove = async function(req, res) {
   return ReS(res, { message: "Deleted User" });
 };
 module.exports.remove = remove;
+
+// Reset Password
+const reset_password = async function(req, res) {
+
+    let user, email, err;
+    email = req.params.email;
+  
+    [err, user] = await to(User.findOne({ where: { email: email } }));
+    if (err) return ReE(res, "err finding user", 422);
+
+    const api_key = "16ee2b921cf3dd09a660928479d6465c";
+    const domain = "webhade.com";
+    const mail = "TUMI@gmail.com";
+
+    const mailgun = require('mailgun-js')({apiKey: api_key, domain: domain});
+    
+    const data = {
+      from: mail,
+      to: email,
+      subject: 'Hello',
+      text: 'Testing some Mailgun awesomeness!'
+    };
+    
+    mailgun.messages().send(data, function (error,body) {
+      console.log(body);
+    });
+
+    return ReS(res, { message: "Kirim Email " + email});
+};
+module.exports.reset_password = reset_password;
