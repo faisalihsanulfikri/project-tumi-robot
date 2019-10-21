@@ -1,6 +1,7 @@
 const { User } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
+const pug = require("pug");
 
 const API_KEY = process.env.MAIL_GUN_API_KEY;
 const DOMAIN = process.env.MAIL_GUN_DOMAIN;
@@ -127,7 +128,7 @@ const reset_password = async function(req, res) {
       from: "Admin Robot Tumi <admin@robottradingsaham.com>",
       to: email,
       subject: "User Reset Password",
-      html: pug.renderFile("./views/mail/user_registration.pug")
+      html: pug.renderFile("./views/mail/reset_password.pug",{email: email})
     };
     
     mailgun.messages().send(data, function (error,body) {
