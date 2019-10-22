@@ -2,6 +2,7 @@ const { User } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 const pug = require("pug");
+const jwt = require('jsonwebtoken');
 
 const API_KEY = process.env.MAIL_GUN_API_KEY;
 const DOMAIN = process.env.MAIL_GUN_DOMAIN;
@@ -115,13 +116,23 @@ module.exports.remove = remove;
 
 // Reset Password
 const reset_password = async function(req, res) {
-
-    let user, email, err;
+    let user,reset_token, email, err;
     email = req.body.email;
-  
-    [err, user] = await to(User.findOne({ where: { email: email } }));
-    if (err) return ReE(res, "err finding user", 422);
 
+    
+    [err, user] = await to(User.findOne({ where: { email: email } }));
+    // if (err) return ReE(res, "err finding user", 422);
+    
+    reset_token = jwt.sign({
+      data: email
+    }, 'secret');
+    
+    const body = req.body;
+    body.reset_token = reset_token
+    user.set(body);
+
+    [err, user] = await to(user.save());    
+    
     const mailgun = require('mailgun-js')({apiKey: API_KEY, domain: DOMAIN});
     
     const data = {
@@ -135,6 +146,6 @@ const reset_password = async function(req, res) {
       console.log(body);
     });
 
-    return ReS(res, { message: "Kirim Email " + email});
+    return ReS(res, { message: "Kirim Email " + email + reset_token});
 };
 module.exports.reset_password = reset_password;
