@@ -1,24 +1,22 @@
 "use strict";
 module.exports = {
   up: (queryInterface, Sequelize) => {
-    return queryInterface.createTable("users_setting.models", {
+    return queryInterface.createTable("master_setting", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      master_setting_id: {
-        type: Sequelize.INTEGER
+      config_name: {
+        type: Sequelize.STRING
       },
       config_value: {
-        type: Sequelize.ENUM,
-        defaultValue: "value"
+        type: Sequelize.STRING
       },
       createdAt: {
         allowNull: false,
-        type: Sequelize.DATE,
-        defa
+        type: Sequelize.DATE
       },
       updatedAt: {
         allowNull: false,
@@ -27,6 +25,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable("users_setting.models");
+    return queryInterface.dropTable("master_setting");
   }
 };

@@ -1,18 +1,21 @@
-'use strict';
+"use strict";
 module.exports = {
   up: (queryInterface, Sequelize) => {
-    return queryInterface.createTable('master_setting.models', {
+    return queryInterface.createTable("user_setting", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER
       },
-      config_name: {
-        type: Sequelize.STRING
+      master_setting_id: {
+        type: Sequelize.INTEGER
       },
       config_value: {
         type: Sequelize.STRING
+      },
+      user_id: {
+        type: Sequelize.INTEGER
       },
       createdAt: {
         allowNull: false,
@@ -25,6 +28,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable('master_setting.models');
+    return queryInterface.dropTable("user_setting");
   }
 };

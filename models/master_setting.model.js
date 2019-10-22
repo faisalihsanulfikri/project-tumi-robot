@@ -1,7 +1,7 @@
 "use strict";
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define(
-    "master_setting",
+    "Master_Setting",
     {
       config_name: DataTypes.STRING,
       config_value: DataTypes.STRING
@@ -16,6 +16,5 @@ module.exports = (sequelize, DataTypes) => {
     let json = this.toJSON();
     return json;
   };
-
   return Model;
 };

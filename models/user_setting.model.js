@@ -1,20 +1,22 @@
 "use strict";
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define(
-    "users_setting",
+    "User_Setting",
     {
       master_setting_id: DataTypes.INTEGER,
-      config_value: DataTypes.ENUM({
-        values: ["value", "another value"],
-        defaultValue: "value"
-      })
+      config_value: DataTypes.STRING,
+      user_id: DataTypes.INTEGER
     },
     {}
   );
   Model.associate = function(models) {
-    Model.belongsTo(models.master_setting, {
+    Model.belongsTo(models.User, {
+      foreignKey: "user_id",
+      as: "users"
+    });
+    Model.belongsTo(models.Master_Setting, {
       foreignKey: "master_setting_id",
-      as: "master_setting"
+      as: "master_settings"
     });
   };
   return Model;
