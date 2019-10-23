@@ -24,7 +24,9 @@ router.get("/", function(req, res, next) {
  */
 router.post(    '/auth/register',             UserController.register);
 router.post(    '/auth/login',                UserController.login);
-router.post(     '/reset_password',           UserController.reset_password);
+router.post(     '/send_email_reset_password',           UserController.send_email_reset_password);
+router.put(     '/reset_password/:reset_token',           UserController.reset_password);
+
 
 /**
  * user

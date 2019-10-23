@@ -189,61 +189,66 @@ module.exports.userRegistrationEmail = async function(email) {
   };
   mg.messages().send(data, function(error, body) {});
 };
-module.exports.remove = remove;
 
 // Reset Password
-const reset_password = async function(req, res) {
-    // let user,body,reset_token, email, err;
-    // email = req.body.email;
+module.exports.send_email_reset_password = async function(req, res) {
+    let user, body, reset_token, email, err;
+    email = req.body.email;
 
-    // reset_token = randomstring.generate();
+    reset_token = randomstring.generate();
     
-    // // body = req.body;
-    // // body.reset_token = reset_token
-    // body = {
-    //   "reset_token" : reset_token
-    // }
+    // body = req.body;
+    // body.reset_token = reset_token
+    body = {
+      "reset_token" : reset_token
+    };
 
-    // [err, user] = await to(User.findOne({ where: { email: email } }));
-    // if (err) return ReE(res, "err finding user", 422);
-    
-    // user.set(body);
-
-    // [err, user] = await to(user.save());    
-    
-    // const mailgun = require('mailgun-js')({apiKey: API_KEY, domain: DOMAIN});
-    
-    // const data = {
-    //   from: "Admin Robot Tumi <admin@robottradingsaham.com>",
-    //   to: email,
-    //   subject: "User Reset Password",
-    //   // html: pug.renderFile("./views/mail/reset_password.pug",{email: email})
-    //   html: "<P> Bro</P>"
-    // };
-    
-    // mailgun.messages().send(data, function (error,body) {
-    //   console.log(body);
-    // });
-
-    // return ReS(res, { message: "Kirim Email " + email + reset_token});
-
-    let user, data, user_id, err;
-    user_id = req.body.user_id;
-  
-    data = req.body.email;
-  
-    [err, user] = await to(User.findOne({ where: { id: 1 } }));
+    [err, user] = await to(User.findOne({ where: { email: email } }));
     if (err) return ReE(res, "err finding user", 422);
-    if (!user) return ReE(res, "user not found with id: " + user_id, 422);
-  
-    // user.set(data);
-  
-    // [err, user] = await to(user.save());
-    // if (err) {
-    //   if (err.message == "Validation error")
-    //     err = "The email address or phone number is already in use";
-    //   return ReE(res, err, 422);
-    // }
-    return ReS(res, { message: "Updated User: " + user });
+    
+    user.set(body);
+
+    [err, user] = await to(user.save());    
+    
+    const mailgun = require('mailgun-js')({apiKey: API_KEY, domain: DOMAIN});
+    
+    const data = {
+      from: "Admin Robot Tumi <admin@robottradingsaham.com>",
+      to: email,
+      subject: "User Reset Password",
+      html: pug.renderFile("./views/mail/reset_password.pug",{reset_token: reset_token})
+    };
+    
+    mailgun.messages().send(data, function (error,body) {
+      console.log(body);
+    });
+
+    return ReS(res, { message: "Kirim Email " + email + reset_token});
 };
-module.exports.reset_password = reset_password;
+
+module.exports.reset_password = async function(req, res) {
+  let user, err, body;
+  let reset_token = req.params.reset_token;
+  let data = {};
+  body = req.body;
+
+  data = {
+    password: body.password,
+    reset_token: ""
+  };
+
+  [err, user] = await to(User.findOne({ where: { reset_token: reset_token } }));
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + reset_token + " tidak ditemukan", 422);
+
+  user.set(data);
+
+  [err, user] = await to(user.save());
+  if (err) {
+    if (err.message == "Validation error")
+      err = "Alamat email atau nomor telepon sudah digunakan";
+    return ReE(res, err, 422);
+  }
+  return ReS(res, { message: "User diperbaharui: " + data });
+};
