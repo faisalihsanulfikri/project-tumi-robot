@@ -34,6 +34,10 @@ Fill in the variables to fit your application
 
 - 'timezone' => 'Asia/Jakarta',
 
-#### Sequelize Migration
+#### Sequelize Migration Example
 
 - npx sequelize-cli model:generate --name master_setting.model --attributes config_name:string,config_value:string
+
+#### Sequelize Seeder Example
+
+- npx sequelize-cli seed:generate --name demo-user

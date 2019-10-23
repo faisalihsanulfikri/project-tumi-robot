@@ -99,7 +99,7 @@ router.get(
 );
 router.get(
   "/settings/:setting_id",
-  // passport.authenticate("jwt", { session: false }),
+  passport.authenticate("jwt", { session: false }),
   SettingController.get
 );
 router.get(
