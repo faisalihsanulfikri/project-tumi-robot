@@ -49,6 +49,11 @@ router.delete(
   passport.authenticate("jwt", { session: false }),
   UserController.remove
 );
+router.post(
+  "/users/activation/:user_id",
+  passport.authenticate("jwt", { session: false }),
+  UserController.userActivation
+);
 
 /**
  * Security (Sekuritas)

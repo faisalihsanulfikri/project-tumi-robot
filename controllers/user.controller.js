@@ -1,18 +1,24 @@
 const { User } = require("../models");
 const { Security } = require("../models");
 const { Robot } = require("../models");
-const authService = require("../services/auth.service");
+const { Master_Setting } = require("../models");
+const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
+
+const authService = require("../services/auth.service");
 const pug = require("pug");
 const mailgun = require("mailgun-js");
 const moment = require("moment");
+const CONFIG = require("../config/config");
 
 const API_KEY = process.env.MAIL_GUN_API_KEY;
 const DOMAIN = process.env.MAIL_GUN_DOMAIN;
+const MAIL = process.env.MAIL_GUN_MAIL;
 
 // function register user
 module.exports.register = async function(req, res) {
   const body = req.body;
+  let default_pass = process.env.DEFAULT_PASS_USER_TUMI;
 
   // user data
   let userData = {};
@@ -22,7 +28,7 @@ module.exports.register = async function(req, res) {
   userData.register_date = moment().format("YYYY-MM-DD H:mm:ss");
   userData.status = "pending";
   userData.level = "1";
-  userData.password = "8888";
+  userData.password = default_pass;
   userData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
   userData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
 
@@ -176,14 +182,92 @@ module.exports.remove = async function(req, res) {
   return ReS(res, { message: "User terhapus" });
 };
 
+// function user activation
+module.exports.userActivation = async function(req, res) {
+  const body = req.body;
+  let user, user_id, err;
+  let default_pass = process.env.DEFAULT_PASS_USER_TUMI;
+  user_id = req.params.user_id;
+
+  // user data
+  let userData = {};
+  userData.status = body.status;
+  userData.level = "1";
+  userData.password = default_pass;
+  userData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
+
+  if (
+    userData.status == "pending" ||
+    userData.status == "active" ||
+    userData.status == "suspend"
+  ) {
+    [err, user] = await to(User.findOne({ where: { id: user_id } }));
+    if (err) return ReE(res, "User tidak ditemukan", 422);
+    if (!user)
+      return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
+
+    let currentStatus = user.status;
+
+    user.set(userData);
+
+    [err, user] = await to(user.save());
+    if (err) {
+      if (err.message == "Validation error")
+        err = "Oops. Ada sesuatu yang tidak beres . .";
+      return ReE(res, err, 422);
+    }
+
+    // create default user setting
+    if (userData.status == "active" && currentStatus == "pending") {
+      let m_setting, setting;
+      let u_setting = [];
+      [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
+
+      m_setting.forEach(async (ms, i) => {
+        let config_data = {};
+        config_data = {
+          master_setting_id: ms.id,
+          config_value: ms.config_value,
+          user_id: user.id
+        };
+
+        u_setting[i] = config_data;
+        [err, setting] = await to(User_Setting.create(config_data));
+      });
+    }
+
+    // send user activation email
+    if (userData.status == "active" && currentStatus != "active") {
+      exports.userActivationEmail(user.email, default_pass);
+    }
+
+    return ReS(res, { message: "User " + user.username + " telah aktif" });
+  }
+};
+
 // email user registration
 module.exports.userRegistrationEmail = async function(email) {
   const mg = mailgun({ apiKey: API_KEY, domain: DOMAIN });
   const data = {
-    from: "Admin Robot Tumi <admin@robottradingsaham.com>",
+    from: "Admin Robot Tumi <" + MAIL + ">",
     to: email,
     subject: "User Registration",
     html: pug.renderFile("./views/mail/user_registration.pug")
+  };
+  mg.messages().send(data, function(error, body) {});
+};
+
+// email user activation
+module.exports.userActivationEmail = async function(email, password) {
+  const mg = mailgun({ apiKey: API_KEY, domain: DOMAIN });
+  const data = {
+    from: "Admin Robot Tumi <" + MAIL + ">",
+    to: email,
+    subject: "User Activation",
+    html: pug.renderFile("./views/mail/user_activation.pug", {
+      email: email,
+      password: password
+    })
   };
   mg.messages().send(data, function(error, body) {});
 };
