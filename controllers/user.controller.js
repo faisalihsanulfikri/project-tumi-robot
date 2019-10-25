@@ -9,7 +9,7 @@ const authService = require("../services/auth.service");
 const pug = require("pug");
 const mailgun = require("mailgun-js");
 const moment = require("moment");
-const CONFIG = require("../config/config");
+const APP_CONFIG = require("../config/app_config");
 
 const API_KEY = process.env.MAIL_GUN_API_KEY;
 const DOMAIN = process.env.MAIL_GUN_DOMAIN;

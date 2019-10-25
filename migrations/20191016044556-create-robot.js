@@ -28,7 +28,9 @@ module.exports = {
         type: Sequelize.STRING
       },
       off_message: {
-        type: Sequelize.STRING
+        type: DataTypes.ENUM,
+        values: ["on", "off"],
+        defaultValue: "off"
       },
       createdAt: {
         allowNull: false,
