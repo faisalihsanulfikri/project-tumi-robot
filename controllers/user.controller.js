@@ -1,6 +1,8 @@
 const { User } = require("../models");
 const { Security } = require("../models");
 const { Robot } = require("../models");
+const { Transaction } = require("../models");
+const { Stock } = require("../models");
 const authService = require("../services/auth.service");
 const { to, ReE, ReS } = require("../services/util.service");
 const pug = require("pug");
@@ -187,3 +189,20 @@ module.exports.userRegistrationEmail = async function(email) {
   };
   mg.messages().send(data, function(error, body) {});
 };
+
+module.exports.get_transaction = async function(req, res) {
+  let transaction;
+  let stock;
+  let transactions
+
+  [err, transaction] = await to(Transaction.findAll({ raw: true }));
+
+  transaction.forEach(el => {
+    transactions = el;
+  });
+  [err, stock] = await to(Stock.findOne({where: { id: transactions.stock_id }}));
+
+
+  return ReS(res, { transaction: transactions, Stock: stock });
+};
+

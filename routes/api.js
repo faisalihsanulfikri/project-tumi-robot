@@ -82,7 +82,14 @@ router.delete(
   passport.authenticate("jwt", { session: false }),
   SecurityController.remove
 );
-
+/*
+* transacsion (transaksi)
+*/
+router.get(
+  "/get_transaction",
+  passport.authenticate("jwt", { session: false }),
+  UserController.get_transaction
+);
 //********* API DOCUMENTATION **********
 router.use(
   "/docs/api.json",
