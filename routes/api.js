@@ -23,15 +23,21 @@ router.get("/", function(req, res, next) {
 /**
  * authorization
  */
-router.post(    '/auth/register',             UserController.register);
-router.post(    '/auth/login',                UserController.login);
-router.post(     '/send_email_reset_password',           UserController.send_email_reset_password);
-router.put(     '/reset_password/:reset_token',           UserController.reset_password);
-
+router.post("/auth/register", UserController.register);
+router.post("/auth/login", UserController.login);
+router.post("/auth/login_admin", UserController.login_admin);
+router.post('/send_email_reset_password', UserController.send_email_reset_password);
+router.put('/reset_password/:reset_token',UserController.reset_password);
 
 /**
  * user
  */
+router.put(
+    '/users/change-password/:user_id',
+    passport.authenticate('jwt', {session:false}),
+    UserController.change_password
+    );
+
 router.get(
   "/users",
   passport.authenticate("jwt", { session: false }),
