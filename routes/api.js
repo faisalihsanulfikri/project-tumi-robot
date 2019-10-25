@@ -28,7 +28,7 @@ router.post(    '/auth/login',                UserController.login);
 router.get(     '/users',                     passport.authenticate('jwt', { session: false }), UserController.getAll);
 router.get(     '/users/:user_id',            passport.authenticate('jwt', { session: false }), UserController.get);
 router.put(     '/users/:user_id',            passport.authenticate('jwt', { session: false }), UserController.update);
-router.put(     '/change/:user_id',           passport.authenticate('jwt', {session:false}),  UserController.change_password);
+router.put(     '/users/change-password/:user_id',           passport.authenticate('jwt', {session:false}),  UserController.change_password);
 router.delete(  '/users/:user_id',            passport.authenticate('jwt', { session: false }), UserController.remove);
 
 /**
