@@ -71,6 +71,12 @@ module.exports = {
           config_value: "15:00:00",
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+        },
+        {
+          config_name: "price_type",
+          config_value: "open",
+          createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+          updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         }
       ],
       {}
