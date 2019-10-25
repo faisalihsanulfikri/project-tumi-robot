@@ -121,6 +121,21 @@ module.exports.login = async function(req, res) {
   }
 };
 
+//function login admin
+module.exports.login_admin = async function(req, res){
+  let body = req.body;
+  let error, user;
+
+  [error ,user] = await to(authService.authUser(body));
+  if(error) return ReE(res, error,422);
+
+  if(user.level == "0"){
+    return ReS(res,{ access_token: user.getJWT(), user: user.toWeb()});
+  }else{
+    return ReE(res, "Anda bukan admin",422);
+  }
+};
+
 // function get user by id
 module.exports.get = async function(req, res) {
   let user, user_id, err;

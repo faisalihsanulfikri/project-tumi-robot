@@ -25,6 +25,7 @@ router.get("/", function(req, res, next) {
  */
 router.post("/auth/register", UserController.register);
 router.post("/auth/login", UserController.login);
+router.post("/auth/login_admin", UserController.login_admin);
 
 /**
  * user
