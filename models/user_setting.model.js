@@ -7,7 +7,10 @@ module.exports = (sequelize, DataTypes) => {
       config_value: DataTypes.STRING,
       user_id: DataTypes.INTEGER
     },
-    {}
+    {
+      freezeTableName: true,
+      tableName: "user_settings"
+    }
   );
   Model.associate = function(models) {
     Model.belongsTo(models.User, {

@@ -6,33 +6,40 @@ const { TE, to } = require("../services/util.service");
 const APP_CONFIG = require("../config/app_config");
 
 module.exports = (sequelize, DataTypes) => {
-  var Model = sequelize.define("User", {
-    username: DataTypes.STRING,
-    email: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      unique: true,
-      validate: { isEmail: { msg: "Email invalid." } }
+  var Model = sequelize.define(
+    "User",
+    {
+      username: DataTypes.STRING,
+      email: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+        validate: { isEmail: { msg: "Email invalid." } }
+      },
+      phone: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+        validate: {
+          len: { args: [7, 20], msg: "Phone number invalid, too short." },
+          isNumeric: { msg: "not a valid phone number." }
+        }
+      },
+      password: DataTypes.STRING,
+      register_date: DataTypes.DATE,
+      level: DataTypes.STRING,
+      status: {
+        type: DataTypes.ENUM,
+        values: ["pending", "active", "suspend"],
+        defaultValue: "pending"
+      },
+      reset_token: DataTypes.STRING
     },
-    phone: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      unique: true,
-      validate: {
-        len: { args: [7, 20], msg: "Phone number invalid, too short." },
-        isNumeric: { msg: "not a valid phone number." }
-      }
-    },
-    password: DataTypes.STRING,
-    register_date: DataTypes.DATE,
-    level: DataTypes.STRING,
-    status: {
-      type: DataTypes.ENUM,
-      values: ["pending", "active", "suspend"],
-      defaultValue: "pending"
-    },
-    reset_token: DataTypes.STRING
-  });
+    {
+      freezeTableName: true,
+      tableName: "users"
+    }
+  );
 
   Model.associate = function(models) {
     // associations can be defined here

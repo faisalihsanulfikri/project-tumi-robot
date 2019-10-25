@@ -12,7 +12,10 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: "off"
       }
     },
-    {}
+    {
+      freezeTableName: true,
+      tableName: "robots"
+    }
   );
   Model.associate = function(models) {
     Model.belongsTo(models.User, {
