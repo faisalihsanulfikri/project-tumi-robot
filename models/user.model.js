@@ -3,7 +3,7 @@ const bcrypt = require("bcrypt");
 const bcrypt_p = require("bcrypt-promise");
 const jwt = require("jsonwebtoken");
 const { TE, to } = require("../services/util.service");
-const CONFIG = require("../config/config");
+const APP_CONFIG = require("../config/app_config");
 
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define("User", {
@@ -26,7 +26,11 @@ module.exports = (sequelize, DataTypes) => {
     password: DataTypes.STRING,
     register_date: DataTypes.DATE,
     level: DataTypes.STRING,
-    status: DataTypes.STRING,
+    status: {
+      type: DataTypes.ENUM,
+      values: ["pending", "active", "suspend"],
+      defaultValue: "pending"
+    },
     reset_token: DataTypes.STRING
   });
 
@@ -61,12 +65,12 @@ module.exports = (sequelize, DataTypes) => {
   };
 
   Model.prototype.getJWT = function() {
-    let expiration_time = parseInt(CONFIG.jwt_expiration);
+    let expiration_time = parseInt(APP_CONFIG.jwt_expiration);
     return (
       "Bearer " +
       jwt.sign(
         { user_id: this.id, user_level: this.level },
-        CONFIG.jwt_encryption,
+        APP_CONFIG.jwt_encryption,
         { expiresIn: expiration_time }
       )
     );

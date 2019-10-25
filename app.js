@@ -8,7 +8,7 @@ const cors = require("cors");
 const api = require("./routes/api");
 const app = express();
 
-const CONFIG = require("./config/config");
+const APP_CONFIG = require("./config/app_config");
 
 app.use(logger("dev"));
 app.use(bodyParser.json());
@@ -21,19 +21,23 @@ app.set("view engine", "pug");
 app.use(passport.initialize());
 
 //Log Env
-console.log("Environment:", CONFIG.app);
+console.log("Environment:", APP_CONFIG.app);
 
 //DATABASE
 const models = require("./models");
 models.sequelize
   .authenticate()
   .then(() => {
-    console.log("Connected to SQL database:", CONFIG.db_name);
+    console.log("Connected to SQL database:", APP_CONFIG.db_name);
   })
   .catch(err => {
-    console.error("Unable to connect to SQL database:", CONFIG.db_name, err);
+    console.error(
+      "Unable to connect to SQL database:",
+      APP_CONFIG.db_name,
+      err
+    );
   });
-if (CONFIG.app === "dev") {
+if (APP_CONFIG.app === "dev") {
   models.sequelize.sync(); //creates table if they do not already exist
   // models.sequelize.sync({ force: true });//deletes all tables then recreates them useful for testing and development purposes
 }

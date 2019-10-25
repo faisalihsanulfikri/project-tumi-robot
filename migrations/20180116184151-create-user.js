@@ -27,7 +27,9 @@ module.exports = {
         type: Sequelize.STRING
       },
       status: {
-        type: Sequelize.STRING
+        type: DataTypes.ENUM,
+        values: ["pending", "active", "suspend"],
+        defaultValue: "pending"
       },
       reset_token: {
         type: Sequelize.STRING
