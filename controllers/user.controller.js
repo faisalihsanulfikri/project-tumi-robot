@@ -309,7 +309,7 @@ module.exports.reset_password = async function(req, res) {
   [err, user] = await to(User.findOne({ where: { reset_token: reset_token } }));
   if (err) return ReE(res, "User tidak ditemukan", 422);
   if (!user)
-    return ReE(res, "User dengan id: " + reset_token + " tidak ditemukan", 422);
+    return ReE(res, "User dengan reset token: " + reset_token + " tidak ditemukan", 422);
 
   user.set(data);
 
