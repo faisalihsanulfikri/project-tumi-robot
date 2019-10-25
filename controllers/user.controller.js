@@ -1,113 +1,276 @@
 const { User } = require("../models");
-const authService = require("../services/auth.service");
+const { Security } = require("../models");
+const { Robot } = require("../models");
+const { Master_Setting } = require("../models");
+const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
+const authService = require("../services/auth.service");
+const pug = require("pug");
+const mailgun = require("mailgun-js");
+const moment = require("moment");
+const APP_CONFIG = require("../config/app_config");
+
+const API_KEY = process.env.MAIL_GUN_API_KEY;
+const DOMAIN = process.env.MAIL_GUN_DOMAIN;
+const MAIL = process.env.MAIL_GUN_MAIL;
+
 // function register user
-const register = async function(req, res) {
+module.exports.register = async function(req, res) {
   const body = req.body;
+  let default_pass = process.env.DEFAULT_PASS_USER_TUMI;
 
-  body.active = "0";
-  body.level = "1";
-  body.password = "8888";
+  // user data
+  let userData = {};
+  userData.username = body.user.username;
+  userData.email = body.user.email;
+  userData.phone = body.user.phone;
+  userData.register_date = moment().format("YYYY-MM-DD H:mm:ss");
+  userData.status = "pending";
+  userData.level = "1";
+  userData.password = default_pass;
+  userData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
+  userData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
 
-  if (!body.unique_key && !body.email) {
-    return ReE(res, "Please enter an email to register.", 422);
-  } else if (!body.phone) {
-    return ReE(res, "Please enter a phone number to register.", 422);
-  } else if (!body.password) {
-    return ReE(res, "Please enter a password to register.", 422);
-  } else {
-    let err, user;
+  // security data
+  let securityData = {};
+  securityData.username = body.security.username;
+  securityData.password = body.security.password;
+  securityData.pin = body.security.pin;
+  securityData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
+  securityData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
 
-    [err, user] = await to(authService.createUser(body));
-
-    if (err) return ReE(res, err, 422);
-    return ReS(
+  if (!userData.unique_key && !userData.email) {
+    return ReE(res, "Silakan masukkan email untuk mendaftar.", 422);
+  }
+  if (!userData.phone) {
+    return ReE(res, "Silakan masukkan nomor telepon untuk mendaftar.", 422);
+  }
+  if (userData.phone.length < 11 || userData.phone.length > 12) {
+    return ReE(res, "Format nomor telepon tidak valid.", 422);
+  }
+  if (!userData.password) {
+    return ReE(res, "Silakan masukkan password untuk mendaftar.", 422);
+  }
+  if (!userData.username) {
+    return ReE(res, "Silakan masukkan nama lengkap untuk mendaftar.", 422);
+  }
+  if (!securityData.username) {
+    return ReE(res, "Silakan masukkan nama sekuritas untuk mendaftar.", 422);
+  }
+  if (!securityData.password) {
+    return ReE(
       res,
-      {
-        message: "Successfully created new user.",
-        user: user.toWeb(),
-        token: user.getJWT()
-      },
-      201
+      "Silakan masukkan password sekuritas untuk mendaftar.",
+      422
     );
   }
+  if (!securityData.pin) {
+    return ReE(res, "Silakan masukkan pin sekuritas untuk mendaftar.", 422);
+  }
+
+  let err, user, security, robot;
+
+  // insert to db user
+  [err, user] = await to(authService.createUser(userData));
+  if (err) return ReE(res, err, 422);
+
+  // insert to db security
+  [err, security] = await to(Security.create(securityData));
+  if (err) return ReE(res, err, 422);
+
+  // robot data
+  let robotData = {};
+  robotData.user_id = user.id;
+  robotData.security_id = security.id;
+  robotData.status = "off";
+  robotData.createdAt = moment().format("YYYY-MM-DD H:mm:ss");
+  robotData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
+
+  [err, robot] = await to(Robot.create(robotData));
+  if (err) return ReE(res, err, 422);
+
+  // send user registration email
+  exports.userRegistrationEmail(user.email);
+
+  return ReS(
+    res,
+    {
+      message: "Berhasil membuat akun baru. Silakan mengecek email anda."
+    },
+    201
+  );
 };
-module.exports.register = register;
 
 // function login user
-const login = async function(req, res) {
+module.exports.login = async function(req, res) {
   const body = req.body;
   let err, user;
 
   [err, user] = await to(authService.authUser(body));
   if (err) return ReE(res, err, 422);
 
-  return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  if (user.status == "active") {
+    return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  } else {
+    return ReE(
+      res,
+      "Akun anda belum aktif, mohon menunggu pemberitahuan lebih lanjut yang akan disampaikan melalui email.",
+      422
+    );
+  }
 };
-module.exports.login = login;
 
 // function get user by id
-const get = async function(req, res) {
+module.exports.get = async function(req, res) {
   let user, user_id, err;
   user_id = req.params.user_id;
 
   [err, user] = await to(User.findOne({ where: { id: user_id } }));
-  if (err) return ReE(res, "err finding user", 422);
-  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
 
   return ReS(res, { user: user.toWeb() });
 };
-module.exports.get = get;
 
 // function get user all
-const getAll = async function(req, res) {
+module.exports.getAll = async function(req, res) {
   let users;
 
   [err, users] = await to(User.findAll({ raw: true }));
 
   return ReS(res, { users: users });
 };
-module.exports.getAll = getAll;
 
 // function update user
-const update = async function(req, res) {
+module.exports.update = async function(req, res) {
   let user, data, user_id, err;
   user_id = req.params.user_id;
 
   data = req.body;
 
   [err, user] = await to(User.findOne({ where: { id: user_id } }));
-  if (err) return ReE(res, "err finding user", 422);
-  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
 
   user.set(data);
 
   [err, user] = await to(user.save());
   if (err) {
     if (err.message == "Validation error")
-      err = "The email address or phone number is already in use";
+      err = "Alamat email atau nomor telepon sudah digunakan";
     return ReE(res, err, 422);
   }
-  return ReS(res, { message: "Updated User: " + user.email });
+  return ReS(res, { message: "User diperbaharui: " + user.email });
 };
-module.exports.update = update;
 
 // function remove user
-const remove = async function(req, res) {
+module.exports.remove = async function(req, res) {
   let user, user_id, err;
   user_id = req.params.user_id;
 
   [err, user] = await to(User.findOne({ where: { id: user_id } }));
-  if (err) return ReE(res, "err finding user", 422);
-  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
 
   [err, user] = await to(user.destroy());
-  if (err) return ReE(res, "error occured trying to delete user", 422);
+  if (err) return ReE(res, "User gagal dihapus", 422);
 
-  return ReS(res, { message: "Deleted User" });
+  return ReS(res, { message: "User terhapus" });
 };
-module.exports.remove = remove;
+
+// function user activation
+module.exports.userActivation = async function(req, res) {
+  const body = req.body;
+  let user, user_id, err;
+  let default_pass = process.env.DEFAULT_PASS_USER_TUMI;
+  user_id = req.params.user_id;
+
+  // user data
+  let userData = {};
+  userData.status = body.status;
+  userData.level = "1";
+  userData.password = default_pass;
+  userData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
+
+  if (
+    userData.status == "pending" ||
+    userData.status == "active" ||
+    userData.status == "suspend"
+  ) {
+    [err, user] = await to(User.findOne({ where: { id: user_id } }));
+    if (err) return ReE(res, "User tidak ditemukan", 422);
+    if (!user)
+      return ReE(res, "User dengan id: " + user_id + " tidak ditemukan", 422);
+
+    let currentStatus = user.status;
+
+    user.set(userData);
+
+    [err, user] = await to(user.save());
+    if (err) {
+      if (err.message == "Validation error")
+        err = "Oops. Ada sesuatu yang tidak beres . .";
+      return ReE(res, err, 422);
+    }
+
+    // create default user setting
+    if (userData.status == "active" && currentStatus == "pending") {
+      let m_setting, setting;
+      let u_setting = [];
+      [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
+
+      m_setting.forEach(async (ms, i) => {
+        let config_data = {};
+        config_data = {
+          master_setting_id: ms.id,
+          config_value: ms.config_value,
+          user_id: user.id
+        };
+
+        u_setting[i] = config_data;
+        [err, setting] = await to(User_Setting.create(config_data));
+      });
+    }
+
+    // send user activation email
+    if (userData.status == "active" && currentStatus != "active") {
+      exports.userActivationEmail(user.email, default_pass);
+    }
+
+    return ReS(res, { message: "User " + user.username + " telah aktif" });
+  }
+};
+
+// email user registration
+module.exports.userRegistrationEmail = async function(email) {
+  const mg = mailgun({ apiKey: API_KEY, domain: DOMAIN });
+  const data = {
+    from: "Admin Robot Tumi <" + MAIL + ">",
+    to: email,
+    subject: "User Registration",
+    html: pug.renderFile("./views/mail/user_registration.pug")
+  };
+  mg.messages().send(data, function(error, body) {});
+};
+
+// email user activation
+module.exports.userActivationEmail = async function(email, password) {
+  const mg = mailgun({ apiKey: API_KEY, domain: DOMAIN });
+  const data = {
+    from: "Admin Robot Tumi <" + MAIL + ">",
+    to: email,
+    subject: "User Activation",
+    html: pug.renderFile("./views/mail/user_activation.pug", {
+      email: email,
+      password: password
+    })
+  };
+  mg.messages().send(data, function(error, body) {});
+};
 
 const change_password = async function(req, res){
     let user, data, user_id, err;
