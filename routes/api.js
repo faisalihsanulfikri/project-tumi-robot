@@ -31,10 +31,10 @@ router.post("/auth/login_admin", UserController.login_admin);
  * user
  */
 router.put(
-    '/users/change-password/:user_id',
-    passport.authenticate('jwt', {session:false}),
-    UserController.change_password
-    );
+  "/users/change-password/:user_id",
+  passport.authenticate("jwt", { session: false }),
+  UserController.change_password
+);
 
 router.get(
   "/users",
@@ -100,7 +100,7 @@ router.delete(
  * Setting
  */
 router.post(
-  "/settings",
+  "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.create
 );
@@ -110,22 +110,17 @@ router.get(
   SettingController.getAll
 );
 router.get(
-  "/settings/:setting_id",
-  passport.authenticate("jwt", { session: false }),
-  SettingController.get
-);
-router.get(
   "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.getByUserId
 );
 router.put(
-  "/settings/:setting_id",
+  "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.update
 );
 router.delete(
-  "/settings/:setting_id",
+  "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.remove
 );
