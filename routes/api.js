@@ -25,10 +25,17 @@ router.get("/", function(req, res, next) {
  */
 router.post("/auth/register", UserController.register);
 router.post("/auth/login", UserController.login);
+router.post("/auth/login_admin", UserController.login_admin);
 
 /**
  * user
  */
+router.put(
+    '/users/change-password/:user_id',
+    passport.authenticate('jwt', {session:false}),
+    UserController.change_password
+    );
+
 router.get(
   "/users",
   passport.authenticate("jwt", { session: false }),
