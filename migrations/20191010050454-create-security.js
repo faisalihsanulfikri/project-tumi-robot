@@ -18,11 +18,11 @@ module.exports = {
         type: Sequelize.STRING
       },
       active_date: {
-        allowNull: false,
+        allowNull: true,
         type: Sequelize.DATE
       },
       expire_date: {
-        allowNull: false,
+        allowNull: true,
         type: Sequelize.DATE
       },
       createdAt: {
@@ -36,6 +36,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable("ecurities");
+    return queryInterface.dropTable("securities");
   }
 };
