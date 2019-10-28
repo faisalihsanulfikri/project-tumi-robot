@@ -25,12 +25,12 @@ module.exports = {
         }
       },
       status: {
-        type: Sequelize.STRING
-      },
-      off_message: {
         type: DataTypes.ENUM,
         values: ["on", "off"],
         defaultValue: "off"
+      },
+      off_message: {
+        type: Sequelize.STRING
       },
       createdAt: {
         allowNull: false,

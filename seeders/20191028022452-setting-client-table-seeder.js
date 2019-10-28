@@ -4,77 +4,89 @@ const moment = require("moment");
 module.exports = {
   up: (queryInterface, Sequelize) => {
     return queryInterface.bulkInsert(
-      "master_settings",
+      "user_settings",
       [
         {
-          config_name: "cost_total",
+          master_setting_id: 1,
           config_value: "",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "fund_used",
+          master_setting_id: 2,
           config_value: "20",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "max_stock",
+          master_setting_id: 3,
           config_value: "5",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "dana_per_stock",
+          master_setting_id: 4,
           config_value: "",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "level_per_stock",
+          master_setting_id: 5,
           config_value: "",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "spread_per_level",
+          master_setting_id: 6,
           config_value: "2",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "profit_per_level",
+          master_setting_id: 7,
           config_value: "1",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "stock_mode",
+          master_setting_id: 8,
           config_value: "default",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "stock_value",
+          master_setting_id: 9,
           config_value: "",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "cl_value",
+          master_setting_id: 10,
           config_value: "8",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "cl_time",
+          master_setting_id: 11,
           config_value: "15:00:00",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         },
         {
-          config_name: "price_type",
+          master_setting_id: 12,
           config_value: "open",
+          user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         }
@@ -84,6 +96,6 @@ module.exports = {
   },
 
   down: (queryInterface, Sequelize) => {
-    return queryInterface.bulkDelete("master_settings", null, {});
+    return queryInterface.bulkDelete("user_settings", null, {});
   }
 };

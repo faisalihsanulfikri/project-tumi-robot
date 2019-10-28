@@ -36,8 +36,16 @@ Fill in the variables to fit your application
 
 #### Sequelize Migration Example
 
+## Create Migration
+
 - npx sequelize-cli model:generate --name master_setting.model --attributes config_name:string,config_value:string
 
 #### Sequelize Seeder Example
 
+## Create Seeder
+
 - npx sequelize-cli seed:generate --name demo-user
+
+## Run Seeder
+
+- npx sequelize-cli db:seed:all
