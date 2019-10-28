@@ -19,8 +19,22 @@ module.exports.get_transaction = async function(req, res) {
 
 module.exports.buyAndSell = async function(req, res) {
 
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+      headless: false
+    });
     const page = await browser.newPage();
-    const data = await page.goto('https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp');
+    await page.goto('https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp');
+    const data = await page.evaluate(() => {
+      let results = [];
+      let items = document.querySelectorAll('td.T1_col_1');
+      items.forEach((item) => {
+          results.push({
+              text: item.innerText,
+          });
+      });
+      return results;
+    })
+    browser.close();
     console.log(data);
+    return ReS(res, {data: data});
   };

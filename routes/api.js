@@ -93,7 +93,6 @@ router.get(
 );
 router.get(
   "/buy-and-sell",
-  passport.authenticate("jwt", { session: false }),
   TransactionController.buyAndSell
 );
 
