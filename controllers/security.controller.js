@@ -3,7 +3,7 @@ const { Robot } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
 // function create security
-const create = async function(req, res) {
+module.exports.create = async function(req, res) {
   let err, security;
 
   let security_info = req.body;
@@ -20,10 +20,9 @@ const create = async function(req, res) {
     201
   );
 };
-module.exports.create = create;
 
 // function get security by id
-const get = async function(req, res) {
+module.exports.get = async function(req, res) {
   let security, security_id, err;
   security_id = req.params.security_id;
 
@@ -34,10 +33,9 @@ const get = async function(req, res) {
 
   return ReS(res, { security: security.toWeb() });
 };
-module.exports.get = get;
 
 // function get security by user id
-const getByUserId = async function(req, res) {
+module.exports.getByUserId = async function(req, res) {
   let security, user_id, err, robot;
   user_id = req.params.user_id;
 
@@ -58,20 +56,18 @@ const getByUserId = async function(req, res) {
 
   return ReS(res, { security: security.toWeb() });
 };
-module.exports.getByUserId = getByUserId;
 
 // function get securities
-const getAll = async function(req, res) {
+module.exports.getAll = async function(req, res) {
   let securities;
 
   [err, securities] = await to(Security.findAll({ raw: true }));
 
   return ReS(res, { securities: securities });
 };
-module.exports.getAll = getAll;
 
 // function update security
-const update = async function(req, res) {
+module.exports.update = async function(req, res) {
   let security, security_id, data, err;
   security_id = req.params.security_id;
 
@@ -91,10 +87,9 @@ const update = async function(req, res) {
   }
   return ReS(res, { message: "Sekuritas diperbaharui" });
 };
-module.exports.update = update;
 
 // function delete security
-const remove = async function(req, res) {
+module.exports.remove = async function(req, res) {
   let security, security_id, err;
   security_id = req.params.security_id;
 
@@ -106,6 +101,5 @@ const remove = async function(req, res) {
   [err, security] = await to(security.destroy());
   if (err) return ReE(res, "Gagal menghapus Sekuritas");
 
-  return ReS(res, { message: "User terhapus" });
+  return ReS(res, { message: "Sekuritas terhapus" });
 };
-module.exports.remove = remove;

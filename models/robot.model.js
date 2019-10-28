@@ -5,10 +5,17 @@ module.exports = (sequelize, DataTypes) => {
     {
       user_id: DataTypes.INTEGER,
       security_id: DataTypes.INTEGER,
-      status: DataTypes.STRING,
+      status: {
+        type: DataTypes.ENUM,
+        values: ["on", "off"],
+        defaultValue: "off"
+      },
       off_message: DataTypes.STRING
     },
-    {}
+    {
+      freezeTableName: true,
+      tableName: "robots"
+    }
   );
   Model.associate = function(models) {
     Model.belongsTo(models.User, {

@@ -1,20 +1,16 @@
 "use strict";
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define(
-    "Security",
+    "Master_Setting",
     {
-      username: DataTypes.STRING,
-      password: DataTypes.STRING,
-      pin: DataTypes.STRING,
-      active_date: DataTypes.DATE,
-      expire_date: DataTypes.DATE
+      config_name: DataTypes.STRING,
+      config_value: DataTypes.STRING
     },
     {
       freezeTableName: true,
-      tableName: "securities"
+      tableName: "master_settings"
     }
   );
-
   Model.associate = function(models) {
     // associations can be defined here
   };
@@ -23,6 +19,5 @@ module.exports = (sequelize, DataTypes) => {
     let json = this.toJSON();
     return json;
   };
-
   return Model;
 };
