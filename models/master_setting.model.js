@@ -6,7 +6,10 @@ module.exports = (sequelize, DataTypes) => {
       config_name: DataTypes.STRING,
       config_value: DataTypes.STRING
     },
-    {}
+    {
+      freezeTableName: true,
+      tableName: "master_settings"
+    }
   );
   Model.associate = function(models) {
     // associations can be defined here
