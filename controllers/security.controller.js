@@ -101,5 +101,5 @@ module.exports.remove = async function(req, res) {
   [err, security] = await to(security.destroy());
   if (err) return ReE(res, "Gagal menghapus Sekuritas");
 
-  return ReS(res, { message: "User terhapus" });
+  return ReS(res, { message: "Sekuritas terhapus" });
 };
