@@ -1,19 +1,4 @@
-# Rest Api Node and Mysql
-
-## Description
-
-This is an Restful API for Node.js and Mysql. Designed after PHP's beautiful Laravel. This is in the MVC format,
-except because it is an API there are no views, just models and controllers.
-
-tutorial can be found here: https://medium.com/@brianalois/build-a-rest-api-for-node-mysql-2018-jwt-6957bcfc7ac9
-
-##### Routing : Express
-
-##### ORM Database : Sequelize
-
-##### Authentication : Passport, JWT
-
-## Installation
+# Setup Tumi Api
 
 #### Download Code | Clone the Repo
 
@@ -32,12 +17,76 @@ npm install
 You will find a example.env file in the home directory. Paste the contents of that into a file named .env in the same directory.
 Fill in the variables to fit your application
 
-- 'timezone' => 'Asia/Jakarta',
+```
+APP=dev
+PORT=3000
 
-#### Sequelize Migration Example
+DB_DIALECT=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=robotumi
+DB_USER=root
+DB_PASSWORD=
 
-- npx sequelize-cli model:generate --name master_setting.model --attributes config_name:string,config_value:string
+JWT_ENCRYPTION=PleaseChange
+JWT_EXPIRATION=10000
 
-#### Sequelize Seeder Example
+MAIL_GUN_API_KEY = key-16ee2b921cf3dd09a660928479d6465c
+MAIL_GUN_DOMAIN = webhade.com
+MAIL_GUN_MAIL = admin@robottradingsaham.com
 
-- npx sequelize-cli seed:generate --name demo-user
+DEFAULT_PASS_USER_TUMI=8888
+```
+
+#### Migrate Database
+
+```
+npx sequelize-cli db:migrate
+```
+
+#### Seeder Database
+
+```
+npx sequelize-cli db:seed:all
+```
+
+#### Run The Api
+
+- For development
+
+```
+npm run serve
+```
+
+- For Production
+
+```
+npm run start
+```
+
+#### Done
+
+## Sequelize Notes
+
+### Sequelize Migration Example
+
+- Create Migration
+
+```
+npx sequelize-cli model:generate --name master_setting.model --attributes config_name:string,config_value:string
+```
+
+### Sequelize Seeder Example
+
+- Create Seeder
+
+```
+npx sequelize-cli seed:generate --name demo-user
+
+```
+
+- Run Seeder
+
+```
+npx sequelize-cli db:seed:all
+```

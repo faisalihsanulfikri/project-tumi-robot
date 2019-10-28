@@ -45,6 +45,7 @@ if (APP_CONFIG.app === "dev") {
 app.use(cors());
 
 app.use("/api", api);
+app.use('/api/spreadsheet', require('./routes/spreadsheet'))
 
 app.use("/", function(req, res) {
   res.statusCode = 200; //send the appropriate status code
