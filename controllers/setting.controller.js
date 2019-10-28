@@ -1,6 +1,7 @@
 const { Master_Setting } = require("../models");
 const { User_Setting } = require("../models");
 const { User } = require("../models");
+const { Robot } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
 const moment = require("moment");
@@ -116,19 +117,28 @@ module.exports.getByUserId = async function(req, res) {
 
 // function get settings
 module.exports.getAll = async function(req, res) {
-  let u_setting_data, usersData, m_setting_data;
+  let u_setting_data, usersData, m_setting_data, robotData;
 
   [err, usersData] = await to(User.findAll({ raw: true }));
   [err, m_setting_data] = await to(Master_Setting.findAll({ raw: true }));
   [err, u_setting_data] = await to(User_Setting.findAll({ raw: true }));
+  [err, robotData] = await to(Robot.findAll({ raw: true }));
 
   let settings = [];
   let config_name = "";
+  let activate = "";
 
   usersData.forEach((ud, i) => {
     let filter_setting = u_setting_data.filter(el => {
       return el.user_id == ud.id;
     });
+
+    if (ud.id > 1) {
+      let filter_robot = robotData.filter(el => {
+        return el.user_id == ud.id;
+      });
+      activate = filter_robot[0].status;
+    }
 
     let dataSetting = {};
     filter_setting.forEach(fs => {
@@ -140,9 +150,15 @@ module.exports.getAll = async function(req, res) {
       dataSetting[config_name] = fs.config_value;
     });
 
+    let dataUser = {
+      id: ud.id,
+      username: ud.username
+    };
+
     settings[i] = {
-      user_id: ud.id,
-      setting: dataSetting
+      user: dataUser,
+      setting: dataSetting,
+      activate: activate
     };
   });
 
