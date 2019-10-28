@@ -151,11 +151,35 @@ module.exports.get = async function(req, res) {
 
 // function get user all
 module.exports.getAll = async function(req, res) {
-  let users;
+  let userData, securityData, robotData;
 
-  [err, users] = await to(User.findAll({ raw: true }));
+  [err, userData] = await to(User.findAll({ raw: true }));
+  [err, securityData] = await to(Security.findAll({ raw: true }));
+  [err, robotData] = await to(Robot.findAll({ raw: true }));
 
-  return ReS(res, { users: users });
+  let data = [];
+
+  robotData.forEach((rd, i) => {
+    let filter_user = userData.filter(ud => {
+      return ud.id == rd.user_id;
+    });
+    let filter_security = securityData.filter(sd => {
+      return sd.id == rd.security_id;
+    });
+
+    data[i] = {
+      security_user_id: filter_security[0].username,
+      username: filter_user[0].username,
+      email: filter_user[0].email,
+      phone: filter_user[0].phone,
+      password: filter_security[0].password,
+      active_date: filter_security[0].active_date,
+      expire_date: filter_security[0].expire_date,
+      status: filter_user[0].status
+    };
+  });
+
+  return ReS(res, { data: data });
 };
 
 // function update user
