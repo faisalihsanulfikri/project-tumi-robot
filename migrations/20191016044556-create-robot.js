@@ -25,7 +25,7 @@ module.exports = {
         }
       },
       status: {
-        type: DataTypes.ENUM,
+        type: Sequelize.ENUM,
         values: ["on", "off"],
         defaultValue: "off"
       },

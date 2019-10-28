@@ -20,6 +20,9 @@ module.exports = {
         type: Sequelize.STRING,
         unique: true
       },
+      password: {
+        type: Sequelize.STRING
+      },
       register_date: {
         type: Sequelize.DATE
       },
@@ -27,7 +30,7 @@ module.exports = {
         type: Sequelize.STRING
       },
       status: {
-        type: DataTypes.ENUM,
+        type: Sequelize.ENUM,
         values: ["pending", "active", "suspend"],
         defaultValue: "pending"
       },
