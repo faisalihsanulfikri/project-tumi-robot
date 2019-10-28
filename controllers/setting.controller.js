@@ -133,6 +133,7 @@ module.exports.getAll = async function(req, res) {
       return el.user_id == ud.id;
     });
 
+    // ud.id == 1 => id admin
     if (ud.id > 1) {
       let filter_robot = robotData.filter(el => {
         return el.user_id == ud.id;
