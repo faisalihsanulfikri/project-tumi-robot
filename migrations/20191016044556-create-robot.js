@@ -1,7 +1,7 @@
 "use strict";
 module.exports = {
   up: (queryInterface, Sequelize) => {
-    return queryInterface.createTable("Robots", {
+    return queryInterface.createTable("robots", {
       id: {
         allowNull: false,
         autoIncrement: true,
@@ -25,7 +25,9 @@ module.exports = {
         }
       },
       status: {
-        type: Sequelize.STRING
+        type: Sequelize.ENUM,
+        values: ["on", "off"],
+        defaultValue: "off"
       },
       off_message: {
         type: Sequelize.STRING
@@ -41,6 +43,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable("Robots");
+    return queryInterface.dropTable("robots");
   }
 };

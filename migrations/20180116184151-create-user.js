@@ -1,7 +1,7 @@
 "use strict";
 module.exports = {
   up: (queryInterface, Sequelize) => {
-    return queryInterface.createTable("Users", {
+    return queryInterface.createTable("users", {
       id: {
         allowNull: false,
         autoIncrement: true,
@@ -20,6 +20,9 @@ module.exports = {
         type: Sequelize.STRING,
         unique: true
       },
+      password: {
+        type: Sequelize.STRING
+      },
       register_date: {
         type: Sequelize.DATE
       },
@@ -27,7 +30,9 @@ module.exports = {
         type: Sequelize.STRING
       },
       status: {
-        type: Sequelize.STRING
+        type: Sequelize.ENUM,
+        values: ["pending", "active", "suspend"],
+        defaultValue: "pending"
       },
       reset_token: {
         type: Sequelize.STRING
@@ -43,6 +48,6 @@ module.exports = {
     });
   },
   down: (queryInterface, Sequelize) => {
-    return queryInterface.dropTable("Users");
+    return queryInterface.dropTable("users");
   }
 };
