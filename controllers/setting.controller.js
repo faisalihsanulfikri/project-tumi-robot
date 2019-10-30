@@ -220,7 +220,8 @@ module.exports.update = async function(req, res) {
           element +
           " dengan user_id: " +
           user_id +
-          " tidak ditemukan"
+          " tidak ditemukan",
+        422
       );
 
     // update data user setting
