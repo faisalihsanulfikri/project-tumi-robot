@@ -168,6 +168,7 @@ module.exports.getAll = async function(req, res) {
     });
 
     data[i] = {
+      id: filter_user[0].id,
       security_user_id: filter_security[0].username,
       username: filter_user[0].username,
       email: filter_user[0].email,
@@ -258,6 +259,28 @@ module.exports.userActivation = async function(req, res) {
 
     // create default user setting
     if (userData.status == "active" && currentStatus == "pending") {
+      // active date
+      let err, robot, security;
+
+      [err, robot] = await to(Robot.findOne({ where: { user_id: user.id } }));
+      [err, security] = await to(
+        Security.findOne({ where: { id: robot.security_id } })
+      );
+
+      let now = moment().format("YYYY-MM-DD H:mm:ss");
+
+      let securityData = {};
+      securityData.active_date = moment().format("YYYY-MM-DD H:mm:ss");
+      securityData.expire_date = moment(now, "YYYY-MM-DD H:mm:ss").add(
+        3,
+        "months"
+      );
+      securityData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
+
+      security.set(securityData);
+      [err, security] = await to(security.save());
+
+      // generate setting
       let m_setting, setting;
       let u_setting = [];
       [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
