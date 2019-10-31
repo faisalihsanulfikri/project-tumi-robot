@@ -80,12 +80,51 @@ module.exports.buyAndSell = async function(req, res) {
     await page.waitFor(1000);
 
     const data = await page.evaluate(() => {
-      let results = [];
-      let div;
-      let items = document.querySelectorAll('td[class=T1_col_1]');
-      items.textContent;
+
+      let items = document.querySelector('tbody[id=_orderTable]').children;
+      // items.forEach((item) => {
+        // console.log('items.length', items);
+        let test = [];
+        let item = {};
+        // test[0] = items[0].textContent;
+        // test[1] = items[1].textContent;
+        // test[2] = items[2].textContent;
+        // test[3] = items[3].textContent;
+        // test[4] = items[4].textContent;
+        // test[5] = items[5].textContent;
+        // test[6] = items[6].textContent;
+        // test[7] = items[7].textContent;
+        // test[8] = items[8].textContent;
+        // test[9] = items[9].textContent;
+        // test[10] = items[10].textContent;
+        // test[11] = items[11].textContent;
+        // test[12] = items[12].textContent;
+        
+        for(let i= 0;i <= items.length;i++){
+          test[i] = items[i];
+        } 
+          // console.log(test)
+          const txt = test;
+          
+          txt.children;
+          console.log(txt)
+          item.order_time = txt[1].textContent
+          item.order_id = txt[2].textContent
+          item.mode = txt[3].textContent
+          item.price = txt[5].textContent
+          item.status = txt[8].textContent
+          item.order_amount = txt[9].textContent
+          item.validity = txt[11].textContent
+          // console.log(item)
+        // console.log(div.textContent);
+        // if(!item.children){
+        //   div = item.innerHTML;
+        // console.log(div);
+        // }
+      // });
+      // items.inner;
       // console.log(items);
-      return items;
+      // return items;
     })
     // console.log(data);
     // return ReS(res, {data: data});
@@ -105,15 +144,13 @@ module.exports.buyAndSell = async function(req, res) {
       });
 
       const page = await browser.newPage();
-      await page.waitFor(40000);
+      await page.waitFor(30000);
 
-      console.log(buyandsell.data);
-
-      transaction.order_time = buyandsell.data[0];
+      transaction.order_time = buyandsell.data[0]
       transaction.order_id = buyandsell.data[1]
       transaction.mode = buyandsell.data[3]
-      transaction.price = buyandsell.data[5];
-      transaction.status = buyandsell.data[8];
+      transaction.price = buyandsell.data[5]
+      transaction.status = buyandsell.data[8]
       transaction.order_amount = buyandsell.data[9]
       transaction.validity = buyandsell.data[11]
       
