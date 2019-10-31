@@ -5,12 +5,12 @@ module.exports = (sequelize, DataTypes) => {
     {
       user_id: DataTypes.INTEGER,
       security_id: DataTypes.INTEGER,
-      status: DataTypes.STRING,
-      off_message: {
+      status: {
         type: DataTypes.ENUM,
         values: ["on", "off"],
         defaultValue: "off"
-      }
+      },
+      off_message: DataTypes.STRING
     },
     {
       freezeTableName: true,

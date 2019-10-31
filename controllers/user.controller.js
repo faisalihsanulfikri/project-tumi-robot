@@ -48,7 +48,7 @@ module.exports.register = async function(req, res) {
   if (!userData.phone) {
     return ReE(res, "Silakan masukkan nomor telepon untuk mendaftar.", 422);
   }
-  if (userData.phone.length < 11 || userData.phone.length > 12) {
+  if (userData.phone.length < 10 || userData.phone.length > 20) {
     return ReE(res, "Format nomor telepon tidak valid.", 422);
   }
   if (!userData.password) {
@@ -124,17 +124,17 @@ module.exports.login = async function(req, res) {
 };
 
 //function login admin
-module.exports.login_admin = async function(req, res){
+module.exports.login_admin = async function(req, res) {
   let body = req.body;
   let error, user;
 
-  [error ,user] = await to(authService.authUser(body));
-  if(error) return ReE(res, error,422);
+  [error, user] = await to(authService.authUser(body));
+  if (error) return ReE(res, error, 422);
 
-  if(user.level == "0"){
-    return ReS(res,{ access_token: user.getJWT(), user: user.toWeb()});
-  }else{
-    return ReE(res, "Anda bukan admin",422);
+  if (user.level == "0") {
+    return ReS(res, { access_token: user.getJWT(), user: user.toWeb() });
+  } else {
+    return ReE(res, "Anda bukan admin", 422);
   }
 };
 
@@ -254,7 +254,7 @@ module.exports.userActivation = async function(req, res) {
     }
 
     // send user activation email
-    if (userData.status == "active" && currentStatus != "active") {
+    if (userData.status == "active" && currentStatus == "pending") {
       exports.userActivationEmail(user.email, default_pass);
     }
 
@@ -352,19 +352,19 @@ module.exports.userActivationEmail = async function(email, password) {
   mg.messages().send(data, function(error, body) {});
 };
 
-const change_password = async function(req, res){
-    let user, data, user_id, err;
-    user_id = req.params.user_id;
-    
-    data = req.body;
+const change_password = async function(req, res) {
+  let user, data, user_id, err;
+  user_id = req.params.user_id;
 
-    [err, user] = await to(User.findOne({ where: { id: user_id } }));
-    if (err) return ReE(res, "err finding user");
-    if (!user) return ReE(res, "user not found with id: " + user_id, 422);
+  data = req.body;
 
-    user.set(data);
+  [err, user] = await to(User.findOne({ where: { id: user_id } }));
+  if (err) return ReE(res, "err finding user");
+  if (!user) return ReE(res, "user not found with id: " + user_id, 422);
 
-    [err, user] = await to(user.save());
-    return ReS(res, {message :'change Password: '+user.password});
-}
+  user.set(data);
+
+  [err, user] = await to(user.save());
+  return ReS(res, { message: "change Password: " + user.password });
+};
 module.exports.change_password = change_password;

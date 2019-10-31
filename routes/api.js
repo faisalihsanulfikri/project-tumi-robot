@@ -4,6 +4,7 @@ const router = express.Router();
 const SecurityController = require("../controllers/security.controller");
 const SettingController = require("../controllers/setting.controller");
 const UserController = require("../controllers/user.controller");
+const RobotController = require("../controllers/robot.controller");
 
 const custom = require("./../middleware/custom");
 
@@ -29,14 +30,16 @@ router.post("/auth/login_admin", UserController.login_admin);
 router.post('/send_email_reset_password', UserController.send_email_reset_password);
 router.put('/reset_password/:reset_token',UserController.reset_password);
 
+router.get("/run", RobotController.run);
+
 /**
  * user
  */
 router.put(
-    '/users/change-password/:user_id',
-    passport.authenticate('jwt', {session:false}),
-    UserController.change_password
-    );
+  "/users/change-password/:user_id",
+  passport.authenticate("jwt", { session: false }),
+  UserController.change_password
+);
 
 router.get(
   "/users",
@@ -102,7 +105,7 @@ router.delete(
  * Setting
  */
 router.post(
-  "/settings",
+  "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.create
 );
@@ -112,22 +115,17 @@ router.get(
   SettingController.getAll
 );
 router.get(
-  "/settings/:setting_id",
-  passport.authenticate("jwt", { session: false }),
-  SettingController.get
-);
-router.get(
   "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.getByUserId
 );
 router.put(
-  "/settings/:setting_id",
+  "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.update
 );
 router.delete(
-  "/settings/:setting_id",
+  "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.remove
 );

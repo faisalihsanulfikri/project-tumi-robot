@@ -84,6 +84,6 @@ module.exports = {
   },
 
   down: (queryInterface, Sequelize) => {
-    return queryInterface.bulkDelete("Master_Setting", null, {});
+    return queryInterface.bulkDelete("master_settings", null, {});
   }
 };
