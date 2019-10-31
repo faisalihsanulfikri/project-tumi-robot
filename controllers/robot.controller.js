@@ -23,12 +23,19 @@ module.exports.run = async function(req, res) {
   let stock_value_string = thisUser.setting.stock_value;
   let stock_value_data = stock_value_string.split(",", 4);
 
-  // let data = {};
-  // stock_value_data.forEach((svd, i) => {
-  //   data[i] = {
-  //     stock: svd
-  //   };
-  // });
+  // let i = 0;
+
+  // let exec = setInterval(function(params) {
+  //   console.log(stock_value_data[i]);
+
+  //   // await stockBuy(page, price_type, stock_value_data[i]);
+  //   i++;
+  //   if (i > 2) {
+  //     clearInterval(exec);
+  //   }
+  // }, 5000);
+
+  // return;
 
   // return res.send(data);
 
@@ -90,19 +97,18 @@ module.exports.run = async function(req, res) {
   await page.click("input[id='_ltEnter']");
 
   // automation buy
-  stock_value_data.forEach((svd, i) => {
-    if (i > 2) {
-      clearTimeout(exec);
-    }
-    let exec = setTimeout(async function(params) {
-      await stockBuy(page, price_type, stock_value_data[i]);
-    }, 5000);
-  });
-  // await stockBuy(page, price_type, stock_value_data[0]);
-  // await stockBuy(page, price_type, stock_value_data[1]);
-  // await stockBuy(page, price_type, stock_value_data[2]);
 
-  // let idx = 0;
+  let i = 0;
+
+  let exec = setInterval(async function(params) {
+    await stockBuy(page, price_type, stock_value_data[i]);
+    console.log(stock_value_data[i]);
+
+    i++;
+    if (i > 2) {
+      clearInterval(exec);
+    }
+  }, 5000);
 };
 
 async function stockBuy(page, price_type, stock) {
