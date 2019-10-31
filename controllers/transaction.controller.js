@@ -57,7 +57,7 @@ module.exports.buyAndSell = async function(req, res) {
     "./public/images/captcha/captcha.png",
     "eng",
     {
-      // logger: m => console.log(m)
+      logger: m => console.log(m)
     }
   ).then(({ data: { text } }) => {
     token = text.replace(/\D+/g, "").trim();
@@ -81,15 +81,46 @@ module.exports.buyAndSell = async function(req, res) {
 
     const data = await page.evaluate(() => {
       let results = [];
+      let div;
       let items = document.querySelectorAll('td[class=T1_col_1]');
-      console.log('items', items);
-      items.forEach((item) => {
-          results.push({
-              text: item.innerText,
-          });
-      });
-      return results;
+      items.textContent;
+      // console.log(items);
+      return items;
     })
     // console.log(data);
-    return ReS(res, {data: data});
+    // return ReS(res, {data: data});
+  };
+
+  module.exports.inputTransaction  = async function(req, res){
+    const puppeteer = require("puppeteer");
+      
+      const transaction = {};
+
+      let buyandsell = module.exports.buyAndSell();
+      console.log(buyandsell);
+
+      const browser = await puppeteer.launch({
+        headless: true,
+        defaultViewport: null
+      });
+
+      const page = await browser.newPage();
+      await page.waitFor(40000);
+
+      console.log(buyandsell.data);
+
+      transaction.order_time = buyandsell.data[0];
+      transaction.order_id = buyandsell.data[1]
+      transaction.mode = buyandsell.data[3]
+      transaction.price = buyandsell.data[5];
+      transaction.status = buyandsell.data[8];
+      transaction.order_amount = buyandsell.data[9]
+      transaction.validity = buyandsell.data[11]
+      
+      console.log(transaction);
+      
+      [err, Transaction] = await to(Transaction.create(transaction));
+
+
+      return ReS(res, { message: "Berhasil Input Transaksi" },201  );
   };

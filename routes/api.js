@@ -111,6 +111,10 @@ router.get(
   "/buy-and-sell",
   TransactionController.buyAndSell
 );
+router.post(
+  "/input-transaction",
+  TransactionController.inputTransaction
+);
 
 
 /**
