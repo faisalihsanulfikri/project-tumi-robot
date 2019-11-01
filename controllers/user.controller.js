@@ -7,6 +7,8 @@ const { to, ReE, ReS } = require("../services/util.service");
 
 const authService = require("../services/auth.service");
 const pug = require("pug");
+const randomstring = require("randomstring");
+ 
 const mailgun = require("mailgun-js");
 const moment = require("moment");
 const APP_CONFIG = require("../config/app_config");
@@ -151,11 +153,36 @@ module.exports.get = async function(req, res) {
 
 // function get user all
 module.exports.getAll = async function(req, res) {
-  let users;
+  let userData, securityData, robotData;
 
-  [err, users] = await to(User.findAll({ raw: true }));
+  [err, userData] = await to(User.findAll({ raw: true }));
+  [err, securityData] = await to(Security.findAll({ raw: true }));
+  [err, robotData] = await to(Robot.findAll({ raw: true }));
 
-  return ReS(res, { users: users });
+  let data = [];
+
+  robotData.forEach((rd, i) => {
+    let filter_user = userData.filter(ud => {
+      return ud.id == rd.user_id;
+    });
+    let filter_security = securityData.filter(sd => {
+      return sd.id == rd.security_id;
+    });
+
+    data[i] = {
+      id: filter_user[0].id,
+      security_user_id: filter_security[0].username,
+      username: filter_user[0].username,
+      email: filter_user[0].email,
+      phone: filter_user[0].phone,
+      password: filter_security[0].password,
+      active_date: filter_security[0].active_date,
+      expire_date: filter_security[0].expire_date,
+      status: filter_user[0].status
+    };
+  });
+
+  return ReS(res, { data: data });
 };
 
 // function update user
@@ -234,6 +261,28 @@ module.exports.userActivation = async function(req, res) {
 
     // create default user setting
     if (userData.status == "active" && currentStatus == "pending") {
+      // active date
+      let err, robot, security;
+
+      [err, robot] = await to(Robot.findOne({ where: { user_id: user.id } }));
+      [err, security] = await to(
+        Security.findOne({ where: { id: robot.security_id } })
+      );
+
+      let now = moment().format("YYYY-MM-DD H:mm:ss");
+
+      let securityData = {};
+      securityData.active_date = moment().format("YYYY-MM-DD H:mm:ss");
+      securityData.expire_date = moment(now, "YYYY-MM-DD H:mm:ss").add(
+        3,
+        "months"
+      );
+      securityData.updatedAt = moment().format("YYYY-MM-DD H:mm:ss");
+
+      security.set(securityData);
+      [err, security] = await to(security.save());
+
+      // generate setting
       let m_setting, setting;
       let u_setting = [];
       [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
@@ -270,6 +319,69 @@ module.exports.userRegistrationEmail = async function(email) {
     html: pug.renderFile("./views/mail/user_registration.pug")
   };
   mg.messages().send(data, function(error, body) {});
+};
+
+// Reset Password
+module.exports.send_email_reset_password = async function(req, res) {
+    let user, body, reset_token, email, err;
+    email = req.body.email;
+
+    reset_token = randomstring.generate();
+    
+    // body = req.body;
+    // body.reset_token = reset_token
+    body = {
+      "reset_token" : reset_token
+    };
+
+    [err, user] = await to(User.findOne({ where: { email: email } }));
+    if (err) return ReE(res, "err finding user", 422);
+    
+    user.set(body);
+
+    [err, user] = await to(user.save());    
+    
+    const mailgun = require('mailgun-js')({apiKey: API_KEY, domain: DOMAIN});
+    
+    const data = {
+      from: "Admin Robot Tumi <admin@robottradingsaham.com>",
+      to: email,
+      subject: "User Reset Password",
+      html: pug.renderFile("./views/mail/reset_password.pug",{reset_token: reset_token})
+    };
+    
+    mailgun.messages().send(data, function (error,body) {
+      console.log(body);
+    });
+
+    return ReS(res, { message: "Kirim Email " + email + reset_token});
+};
+
+module.exports.reset_password = async function(req, res) {
+  let user, err, body;
+  let reset_token = req.params.reset_token;
+  let data = {};
+  body = req.body;
+
+  data = {
+    password: body.password,
+    reset_token: ""
+  };
+
+  [err, user] = await to(User.findOne({ where: { reset_token: reset_token } }));
+  if (err) return ReE(res, "User tidak ditemukan", 422);
+  if (!user)
+    return ReE(res, "User dengan reset token: " + reset_token + " tidak ditemukan", 422);
+
+  user.set(data);
+
+  [err, user] = await to(user.save());
+  if (err) {
+    if (err.message == "Validation error")
+      err = "Alamat email atau nomor telepon sudah digunakan";
+    return ReE(res, err, 422);
+  }
+  return ReS(res, { message: "User diperbaharui: " + data });
 };
 
 // email user activation
