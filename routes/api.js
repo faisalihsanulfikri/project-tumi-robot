@@ -4,6 +4,7 @@ const router = express.Router();
 const SecurityController = require("../controllers/security.controller");
 const SettingController = require("../controllers/setting.controller");
 const UserController = require("../controllers/user.controller");
+const TransactionController = require("../controllers/transaction.controller");
 const RobotController = require("../controllers/robot.controller");
 
 const custom = require("./../middleware/custom");
@@ -98,6 +99,23 @@ router.delete(
   passport.authenticate("jwt", { session: false }),
   SecurityController.remove
 );
+/*
+* transacsion (transaksi)
+*/
+router.get(
+  "/get-transaction",
+  passport.authenticate("jwt", { session: false }),
+  TransactionController.get_transaction
+);
+router.get(
+  "/buy-and-sell",
+  TransactionController.buyAndSell
+);
+router.post(
+  "/input-transaction",
+  TransactionController.inputTransaction
+);
+
 
 /**
  * Setting
