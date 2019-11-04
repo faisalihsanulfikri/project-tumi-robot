@@ -217,11 +217,11 @@ async function setSettings(user_id, settings) {
   let u_setting, m_setting, data, err;
 
   data = {
-    cost_total: await settings.cost_total.replace(",", ""),
+    cost_total: await settings.cost_total.replace(/,\s*/g, ""),
     fund_used: settings.fund_used,
     max_stock: settings.max_stock,
     dana_per_stock:
-      ((await settings.cost_total.replace(",", "")) *
+      ((await settings.cost_total.replace(/,\s*/g, "")) *
         (settings.fund_used / 100)) /
       settings.max_stock,
     level_per_stock: settings.level_per_stock,
