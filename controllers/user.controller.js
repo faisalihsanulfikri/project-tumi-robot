@@ -354,7 +354,7 @@ module.exports.send_email_reset_password = async function(req, res) {
       console.log(body);
     });
 
-    return ReS(res, { message: "Kirim Email " + email + reset_token});
+    return ReS(res, { message: "Kirim Email " + email });
 };
 
 module.exports.reset_password = async function(req, res) {
