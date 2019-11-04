@@ -96,8 +96,6 @@ module.exports.run = async function(req, res) {
 
   let settings = await setSettings(thisUser.user_id, thisUser.setting);
 
-  // return ReS(res, { setting: settings });
-
   let price_type = await settings.price_type;
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
@@ -144,9 +142,11 @@ module.exports.run = async function(req, res) {
   //   i++;
   // }, 5000);
 
-  // let transaction = await getTransaction(res, page);
+  let transaction = await getTransaction(res, page);
 
-  // return res.json(transaction);
+  console.log("transaction ", transaction);
+
+  return res.json(transaction);
 
   // return ReS(res, { transaction: await transaction });
   // return res.send(transaction);
@@ -184,6 +184,11 @@ async function getTransaction(res, page) {
 
   await page.waitFor(1000);
 
+  await page.screenshot({
+    path: "./public/images/page/page.png",
+    omitBackground: true
+  });
+
   try {
     const data = await page.evaluate(() => {
       return new Promise((resolve, reject) => {
@@ -217,6 +222,8 @@ async function getTransaction(res, page) {
 
           items.push(result);
         }
+
+        console.log(items);
 
         resolve(items);
       });
