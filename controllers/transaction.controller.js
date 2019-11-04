@@ -8,14 +8,25 @@ module.exports.get_transaction = async function(req, res) {
   // let stocks
   let transactions
   // [err, transaction] = await to(Transaction.findOne({ where: { user_id: '3' } }));
-  [err, transaction] = await to(Transaction.findAll({ where: { user_id: '3' } }))
+  [err, transaction] = await to(Transaction.findAll({ where: { user_id: '3' } }));
+  
+  // transaction.forEach(async el => {
+  //   transactions = el
+  //   // console.log(el)
+  //   [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
+  // });
+  // console.log(transaction.length)
+  let data = [];
+  for (let i = 0; i < transaction.length; i++) {
+    const el = transaction[i];
+   [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
+    console.log(stock.data)
 
-  transaction.forEach(async el => {
-    transactions = el
-    [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
-    console.log(stock)
-  });
-  return ReS(res, { transactions: transaction.map(el=>el), Stocks: stock })
+    data[i] = stock;
+
+  }
+  return ReS(res, { transactions: transaction.map(el=>el), Stocks: data })
+
 }
 
 module.exports.buyAndSell = async function(req, res) {
