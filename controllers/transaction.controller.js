@@ -5,18 +5,16 @@ const { Stock } = require("../models")
 module.exports.get_transaction = async function(req, res) {
   let transaction
   let stock
-  let stocks
-  let transactions;
+  // let stocks
+  let transactions
   // [err, transaction] = await to(Transaction.findOne({ where: { user_id: '3' } }));
   [err, transaction] = await to(Transaction.findAll({ where: { user_id: '3' } }))
 
   transaction.forEach(async el => {
     transactions = el
-    [err, stock] = await to(
-     Stock.findAll({ where: { id: el.stock_id } })
-   )
-   console.log(stock)
-  })
+    [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
+    console.log(stock)
+  });
   return ReS(res, { transactions: transaction.map(el=>el), Stocks: stock })
 }
 
