@@ -5,47 +5,48 @@ const { Master_Setting } = require("../models");
 const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
+const moment = require("moment");
+
 module.exports.run = async function(req, res) {
   const puppeteer = require("puppeteer");
   const Tesseract = require("../node_modules/tesseract.js");
   const fs = require("fs");
 
+  const URL_login =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
+  const URL_protofolio =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/portfolio.jsp";
+  const URL_runningTrade =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp";
+
   let users = await getUsers();
 
   let thisUser = users[0];
 
-  // return res.send(thisUser.setting.price_type);
+  // return res.send(thisUser);
 
   let username = thisUser.security_user_id;
   let password = thisUser.password;
   let pin = thisUser.pin;
-  let price_type = thisUser.setting.price_type;
-  let stock_value_string = thisUser.setting.stock_value;
-  let stock_value_data = stock_value_string.split(",", 4);
 
-  // let data = {};
-  // stock_value_data.forEach((svd, i) => {
-  //   data[i] = {
-  //     stock: svd
-  //   };
-  // });
-
-  // return res.send(data);
-
-  // open browser
+  /**
+   * OPEN BROWSER
+   */
   const browser = await puppeteer.launch({
     headless: false,
     defaultViewport: null
   });
 
-  const URL = "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
+  /**
+   * OPEN RHB PAGE
+   */
   const page = await browser.newPage();
-
-  // open rhb page
-  await page.goto(URL);
+  await page.goto(URL_login);
   await page.waitFor(2000);
 
-  // login rhb
+  /**
+   * LOGIN RHB
+   */
   await page.type("input[id='j_username']", username);
   await page.type("input[id='password']", password);
 
@@ -81,28 +82,51 @@ module.exports.run = async function(req, res) {
   await page.type("input[id='j_token']", tokenCaptcha);
   await page.click("button[type=submit]");
 
-  // login trading
-  await page.goto(
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp"
+  /**
+   * GET SETTING DATA FROM RHB
+   */
+  await page.goto(URL_protofolio);
+  await page.waitFor(500);
+
+  let cost_total = await page.evaluate(
+    () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
   );
+
+  thisUser.setting.cost_total = cost_total;
+
+  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+
+  // return ReS(res, { setting: settings });
+
+  let price_type = await settings.price_type;
+  let stock_value_string = await settings.stock_value;
+  let stock_value_data = await stock_value_string.split(",", 4);
+
+  /**
+   * LOGIN TRADING
+   */
+  await page.goto(URL_runningTrade);
   await page.click("button[onclick='objPopup.showLoginTrading();']");
   await page.type("input[id='_ltPin']", pin);
   await page.click("input[id='_ltEnter']");
 
-  // automation buy
-  stock_value_data.forEach((svd, i) => {
-    if (i > 2) {
-      clearTimeout(exec);
-    }
-    let exec = setTimeout(async function(params) {
-      await stockBuy(page, price_type, stock_value_data[i]);
-    }, 5000);
-  });
-  // await stockBuy(page, price_type, stock_value_data[0]);
-  // await stockBuy(page, price_type, stock_value_data[1]);
-  // await stockBuy(page, price_type, stock_value_data[2]);
+  /**
+   * AUTOMATION BUY
+   */
+  let i = 0;
 
-  // let idx = 0;
+  let exec = setInterval(async function() {
+    if (i > 2) {
+      clearInterval(exec);
+    } else {
+      console.log("i ", i);
+      console.log("stock ", stock_value_data[i]);
+      await stockBuy(page, price_type, stock_value_data[i]);
+      console.log("finish");
+    }
+
+    i++;
+  }, 5000);
 };
 
 async function stockBuy(page, price_type, stock) {
@@ -167,6 +191,7 @@ async function getUsers() {
     });
 
     data[i] = {
+      user_id: filter_user[0].id,
       security_user_id: filter_security[0].username,
       username: filter_user[0].username,
       email: filter_user[0].email,
@@ -175,17 +200,92 @@ async function getUsers() {
       pin: filter_security[0].pin,
       active_date: filter_security[0].active_date,
       expire_date: filter_security[0].expire_date,
-      status: filter_user[0].status,
+      user_status: filter_user[0].status,
+      robot_status: rd.status,
       setting: dataSetting
     };
   });
 
   let filter_data = data.filter(d => {
-    return d.status == "active";
+    return d.user_status == "active" && d.robot_status == "on";
   });
 
-  console.log(filter_data);
   return filter_data;
+}
+
+async function setSettings(user_id, settings) {
+  let u_setting, m_setting, data, err;
+
+  data = {
+    cost_total: await settings.cost_total.replace(",", ""),
+    fund_used: settings.fund_used,
+    max_stock: settings.max_stock,
+    dana_per_stock:
+      ((await settings.cost_total.replace(",", "")) *
+        (settings.fund_used / 100)) /
+      settings.max_stock,
+    level_per_stock: settings.level_per_stock,
+    spread_per_level: settings.spread_per_level,
+    profit_per_level: settings.profit_per_level,
+    stock_mode: settings.stock_mode,
+    stock_value: settings.stock_value,
+    cl_value: settings.cl_value,
+    cl_time: settings.cl_time,
+    price_type: settings.price_type
+  };
+
+  let updateData = {};
+  let element;
+
+  // update data
+  for (const i in await data) {
+    element = i;
+    updateData = {
+      config_value: data[i],
+      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    };
+
+    // get master id setting
+    [err, m_setting] = await to(
+      Master_Setting.findOne({
+        where: { config_name: element }
+      })
+    );
+
+    // get data user setting
+    [err, u_setting] = await to(
+      User_Setting.findOne({
+        where: { user_id: user_id, master_setting_id: m_setting.id }
+      })
+    );
+
+    // update data user setting
+    u_setting.set(updateData);
+    [err, u_setting] = await to(u_setting.save());
+  }
+  // end update data
+
+  [err, u_setting] = await to(
+    User_Setting.findAll({
+      where: { user_id: user_id }
+    })
+  );
+
+  [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
+
+  let setting = {};
+  let config_name = "";
+
+  u_setting.forEach(async (el, i) => {
+    m_setting.forEach(ms => {
+      if (ms.id == el.master_setting_id) {
+        config_name = ms.config_name;
+      }
+    });
+    setting[config_name] = el.config_value;
+  });
+
+  return setting;
 }
 
 // get spesify price
