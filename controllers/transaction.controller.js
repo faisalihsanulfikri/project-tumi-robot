@@ -1,20 +1,23 @@
 const { to, ReE, ReS } = require("../services/util.service")
+const { Transaction } = require("../models")
 const { Stock } = require("../models")
 
 module.exports.get_transaction = async function(req, res) {
   let transaction
   let stock
-  let transactions
-  ;[err, transaction] = await to(Transaction.findAll({ raw: true }))
+  let stocks
+  let transactions;
+  // [err, transaction] = await to(Transaction.findOne({ where: { user_id: '3' } }));
+  [err, transaction] = await to(Transaction.findAll({ where: { user_id: '3' } }))
 
-  transaction.forEach(el => {
+  transaction.forEach(async el => {
     transactions = el
+    [err, stock] = await to(
+     Stock.findAll({ where: { id: el.stock_id } })
+   )
+   console.log(stock)
   })
-  ;[err, stock] = await to(
-    Stock.findOne({ where: { id: transactions.stock_id } })
-  )
-
-  return ReS(res, { transaction: transactions, Stock: stock })
+  return ReS(res, { transactions: transaction.map(el=>el), Stocks: stock })
 }
 
 module.exports.buyAndSell = async function(req, res) {
@@ -107,6 +110,7 @@ module.exports.buyAndSell = async function(req, res) {
             result["match_amount"] = row[index].cells[11].textContent
             result["validity"] = row[index].cells[12].textContent
             result["channel"] = row[index].cells[13].textContent
+            result["user_id"] = '3'
           }
 
           items.push(result)
@@ -138,7 +142,7 @@ module.exports.inputTransaction  = async function(req, res){
     });
 
     const page = await browser.newPage();
-    await page.waitFor(10000);
+    await page.waitFor(5000);
 
 
     buyandsell.forEach(async el => {
@@ -148,19 +152,9 @@ module.exports.inputTransaction  = async function(req, res){
           [err, transaction] = await to(Transaction.create(el));
         }else{
           transaction.set(el);
-        
           [err, transaction] = await to(transaction.save());
         }
+      });
 
-
-      
-    });
-    
-    
-    // Datatransaction = buyandsell
-    // console.log(Datatransaction);
-    
-
-
-    return ReS(res, { message: "Berhasil Input Transaksi" },201  );
+      return ReS(res, { message: "Berhasil Input Transaksi" },201  );
 };
