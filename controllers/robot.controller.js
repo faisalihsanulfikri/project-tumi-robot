@@ -113,22 +113,46 @@ module.exports.run = async function(req, res) {
   /**
    * AUTOMATION BUY
    */
-  let i = 0;
+  // if (stock_value_data.length > 0) {
+  //   let i = 0;
+  //   let length = stock_value_data.length - 1;
+  //   let exec = setInterval(async function() {
+  //     if (i > length) {
+  //       clearInterval(exec);
+  //     } else {
+  //       console.log("i ", i);
+  //       console.log("stock ", stock_value_data[i]);
+  //       await stockBuy(page, price_type, stock_value_data[i]);
+  //       console.log("finish");
+  //     }
 
-  let exec = setInterval(async function() {
-    if (i > 2) {
-      clearInterval(exec);
-    } else {
-      console.log("i ", i);
-      console.log("stock ", stock_value_data[i]);
-      await stockBuy(page, price_type, stock_value_data[i]);
-      console.log("finish");
-    }
+  //     i++;
+  //   }, 5000);
+  // }
 
-    i++;
-  }, 5000);
+  // let i = 0;
+  // let exec = setInterval(async function() {
+  //   if (i > 2) {
+  //     clearInterval(exec);
+  //   } else {
+  //     console.log("i ", i);
+  //     console.log("stock ", stock_value_data[i]);
+  //     await stockBuy(page, price_type, stock_value_data[i]);
+  //     console.log("finish");
+  //   }
+
+  //   i++;
+  // }, 5000);
+
+  // let transaction = await getTransaction(res, page);
+
+  // return res.json(transaction);
+
+  // return ReS(res, { transaction: await transaction });
+  // return res.send(transaction);
 };
 
+// Set Buy Stocks
 async function stockBuy(page, price_type, stock) {
   await page.goto(
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy"
@@ -150,6 +174,58 @@ async function stockBuy(page, price_type, stock) {
   }
 
   return await page.waitFor(5000);
+}
+
+// Get Transactions
+async function getTransaction(res, page) {
+  await page.goto(
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
+  );
+
+  await page.waitFor(1000);
+
+  try {
+    const data = await page.evaluate(() => {
+      return new Promise((resolve, reject) => {
+        let table = document.querySelector("#_orderTable");
+        let row = table.children;
+        let items = [];
+
+        for (let index = 0; index < row.length; index++) {
+          let result = {};
+
+          for (let i = 0; i < row[index].cells.length; i++) {
+            result["order_time"] = row[index].cells[1].textContent;
+            result["order_id"] = row[index].cells[2].textContent;
+            result["market"] = row[index].cells[3].textContent;
+            result["mode"] = row[index].cells[4].textContent;
+            result["stock"] = row[index].cells[5].textContent;
+            result["price"] = row[index].cells[6].textContent;
+            result["remain"] = row[index].cells[7].textContent;
+            result["match"] = row[index].cells[8].textContent;
+            result["status"] = row[index].cells[9].textContent;
+            if (result["status"] == "Open") {
+              result["lots"] = result["remain"];
+            } else if (result["status"] == "Matched") {
+              result["lots"] = result["match"];
+            }
+            result["order_amount"] = row[index].cells[10].textContent;
+            result["match_amount"] = row[index].cells[11].textContent;
+            result["validity"] = row[index].cells[12].textContent;
+            result["channel"] = row[index].cells[13].textContent;
+          }
+
+          items.push(result);
+        }
+
+        resolve(items);
+      });
+    });
+    console.log(data);
+    return data;
+  } catch (err) {
+    return err;
+  }
 }
 
 // get Users
@@ -213,6 +289,7 @@ async function getUsers() {
   return filter_data;
 }
 
+// set Users settings
 async function setSettings(user_id, settings) {
   let u_setting, m_setting, data, err;
 
@@ -293,8 +370,10 @@ async function getPrice(page, price_type) {
   let price;
   if (price_type == "open") {
     price = await getOpenPrice(page);
+  } else if (price_type == "prev") {
+    price = await getPrevClosePrice(page);
   } else {
-    price = await getPrevPrice(page);
+    price = await getClosePrice(page);
   }
 
   return price;
@@ -307,9 +386,16 @@ async function getOpenPrice(page) {
   );
 }
 
-// get prev price
-async function getPrevPrice(page) {
+// get prev close price
+async function getPrevClosePrice(page) {
   return await page.evaluate(
     () => document.querySelector("span[id='_prev']").innerHTML
+  );
+}
+
+// get close price
+async function getClosePrice(page) {
+  return await page.evaluate(
+    () => document.querySelector("td[id='_last']").innerHTML
   );
 }
