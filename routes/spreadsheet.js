@@ -12,16 +12,54 @@ router.get("/", async (req, res) => {
   await promisify(doc.useServiceAccountAuth)(cred)
 
   const info = await promisify(doc.getInfo)()
-  const sheet = info.worksheets[1]
-  const rows = await promisify(sheet.getRows)({ offset: 1 })
+
+  const pukatSheet = info.worksheets[1]
+  const ch10Sheet = info.worksheets[2]
+  const ch2Sheet = info.worksheets[3]
+  const aroSheet = info.worksheets[5]
+
+  const pukatRows = await promisify(pukatSheet.getRows)({ offset: 1 })
+  const ch10Rows = await promisify(ch10Sheet.getRows)({ offset: 1 })
+  const ch2Rows = await promisify(ch2Sheet.getRows)({ offset: 1 })
+  const aroRows = await promisify(aroSheet.getRows)({ offset: 1 })
 
   let stocks = []
 
-  rows.forEach(el => {
+  pukatRows.forEach(el => {
     stocks.push({
       no: el.no,
       stock: el.stock,
       close: el.close,
+      volume: el.volume,
+      value: el.value
+    })
+  })
+
+  ch10Rows.forEach(el => {
+    stocks.push({
+      no: el.no,
+      stock: el.stock,
+      close: el.hargaclose,
+      volume: el.volume,
+      value: el.value
+    })
+  })
+
+  ch2Rows.forEach(el => {
+    stocks.push({
+      no: el.no,
+      stock: el.stock,
+      close: el.close,
+      volume: el.volume,
+      value: el.value
+    })
+  })
+
+  aroRows.forEach(el => {
+    stocks.push({
+      no: el.no,
+      stock: el.stock,
+      close: el.hargaclose,
       volume: el.volume,
       value: el.value
     })
