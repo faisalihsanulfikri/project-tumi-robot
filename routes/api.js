@@ -103,7 +103,7 @@ router.delete(
 * transacsion (transaksi)
 */
 router.get(
-  "/get-transaction",
+  "/get-transaction/:user_id",
   passport.authenticate("jwt", { session: false }),
   TransactionController.get_transaction
 );

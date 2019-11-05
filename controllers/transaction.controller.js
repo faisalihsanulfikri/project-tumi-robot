@@ -5,17 +5,9 @@ const { Stock } = require("../models")
 module.exports.get_transaction = async function(req, res) {
   let transaction
   let stock
-  // let stocks
-  let transactions
-  // [err, transaction] = await to(Transaction.findOne({ where: { user_id: '3' } }));
-  [err, transaction] = await to(Transaction.findAll({ where: { user_id: '3' } }));
+  let user_id = req.params.user_id;
+  [err, transaction] = await to(Transaction.findAll({ where: { user_id } }));
   
-  // transaction.forEach(async el => {
-  //   transactions = el
-  //   // console.log(el)
-  //   [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
-  // });
-  // console.log(transaction.length)
   let data = [];
   for (let i = 0; i < transaction.length; i++) {
     const el = transaction[i];
