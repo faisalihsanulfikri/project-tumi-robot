@@ -111,7 +111,7 @@ module.exports.buyAndSell = async function(req, res) {
             result["match_amount"] = row[index].cells[11].textContent
             result["validity"] = row[index].cells[12].textContent
             result["channel"] = row[index].cells[13].textContent
-            result["user_id"] = '3'
+            result["user_id"] = req.params.user_id
           }
 
           items.push(result)
