@@ -1,6 +1,6 @@
 'use strict';
 module.exports = (sequelize, DataTypes) => {
-  var transaction = sequelize.define('Transaction', {
+  var Model = sequelize.define('Transaction', {
     stock_id: DataTypes.INTEGER,
     mode: {
       type : DataTypes.ENUM,
@@ -17,21 +17,26 @@ module.exports = (sequelize, DataTypes) => {
     price: DataTypes.INTEGER,
     lots: DataTypes.INTEGER,
     validity: {
-     type : DataTypes.ENUM,
-     values: [
-       'day',
-       'session'
-     ],
-     allowNull: true,
-      },
+      type : DataTypes.ENUM,
+      values: [
+        'day',
+        'session'
+      ],
+      allowNull: true,
+    },
     status:{
       type : DataTypes.ENUM,
       values: [
         'open',
         'matched'
       ],
-       defaultValue: 'open'
-       },
+      defaultValue: 'open'
+    },
+    user_id: DataTypes.INTEGER,
+  },
+  {
+    freezeTableName: true,
+    tableName: "transactions"
   }, {
     classMethods: {
       associate: function(models) {
@@ -39,5 +44,5 @@ module.exports = (sequelize, DataTypes) => {
       }
     }
   });
-  return transaction;
+  return Model;
 };
