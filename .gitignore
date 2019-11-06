@@ -3,3 +3,6 @@
 .DS_Store
 .idea
 package-lock.json
+
+# Disable public images captcha
+public/images/captcha
