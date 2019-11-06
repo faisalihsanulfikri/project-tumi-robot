@@ -97,6 +97,7 @@ module.exports.run = async function(req, res) {
   let settings = await setSettings(thisUser.user_id, thisUser.setting);
 
   let price_type = await settings.price_type;
+  let level_per_stock = await settings.level_per_stock;
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
 
@@ -114,19 +115,27 @@ module.exports.run = async function(req, res) {
   // if (stock_value_data.length > 0) {
   //   let i = 0;
   //   let length = stock_value_data.length - 1;
+  //   let idx = [];
+
   //   let exec = setInterval(async function() {
   //     if (i > length) {
   //       clearInterval(exec);
   //     } else {
   //       console.log("i ", i);
-  //       console.log("stock ", stock_value_data[i]);
-  //       await stockBuy(page, price_type, stock_value_data[i]);
-  //       console.log("finish");
+  //       idx[i] = i;
+  //       if (i == i-1) {
+
+  //       }
+  //       await stockBuy(page, price_type, level_per_stock, stock_value_data[i]);
   //     }
 
   //     i++;
-  //   }, 5000);
+  //   }, 6000);
   // }
+
+  await stockBuy(page, price_type, level_per_stock, stock_value_data[0]);
+  await stockBuy(page, price_type, level_per_stock, stock_value_data[1]);
+  await stockBuy(page, price_type, level_per_stock, stock_value_data[2]);
 
   // let i = 0;
   // let exec = setInterval(async function() {
@@ -142,54 +151,105 @@ module.exports.run = async function(req, res) {
   //   i++;
   // }, 5000);
 
-  let transaction = await getTransaction(res, page);
+  return;
 
-  console.log("transaction ", transaction);
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
 
-  return res.json(transaction);
+  let matchStockBuys = transaction.filter(el => {
+    return el.mode == "Buy" && el.status == "Matched";
+  });
+
+  if (matchStockBuys.length > 0) {
+    let dataStockSell = transaction.map(el => {
+      return {
+        stock: el.stock,
+        mode: el.mode,
+        priceBuy: el.price,
+        priceSell: (parseInt(el.price) + 1).toString()
+      };
+    });
+
+    // stock sell
+    // await stockSell(page, price_type, dataStockSell[0]);
+  }
+  return;
 
   // return ReS(res, { transaction: await transaction });
   // return res.send(transaction);
 };
 
 // Set Buy Stocks
-async function stockBuy(page, price_type, stock) {
-  await page.goto(
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy"
-  );
+async function stockBuy(page, price_type, level, stock) {
+  const URL_orderpad_buy =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
+
+  console.log("stock ", stock);
+  await page.goto(URL_orderpad_buy);
   await page.type("input[id='_stockCode']", stock);
   await page.keyboard.press(String.fromCharCode(13));
   await page.waitFor(3000);
 
-  let price = await getPrice(page, price_type);
+  let price = await getBuyPrice(page, price_type, level);
 
   console.log("type ", price_type);
-  console.log("price ", price);
 
   if (price != "" && price != "&nbsp;") {
     await page.type("input[id='_volume']", "1");
-    await page.type("input[id='_price']", price);
+    await page.type("input[id='_price']", price[0]);
     await page.click("button[id='_enter']");
+    await page.waitFor(1000);
     await page.click("button[id='_confirm']");
+    await page.waitFor(1000);
   }
+
+  console.log("price ", await price);
+  console.log("finish");
+  console.log("#############################################S");
+
+  return await page.waitFor(3000);
+}
+
+// Set Sell Stocks
+async function stockSell(page, price_type, dataStockSell) {
+  const URL_orderpad_sell =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
+  let stock = dataStockSell.stock;
+  // let price = dataStockSell.price;
+  let lots = dataStockSell.lots;
+
+  await page.goto(URL_orderpad_sell);
+
+  await page.type("input[id='_stockCode']", stock);
+  await page.keyboard.press(String.fromCharCode(13));
+  await page.waitFor(3000);
+
+  let getPriceData = await getSellPrice(page, price_type);
+  // let price = parseInt(await price) + 1;
+
+  await page.type("input[id='_volume']", "1");
+  await page.type("input[id='_price']", getPriceData);
+  // await page.click("button[id='_enter']");
+  // await page.waitFor(1000);
+  // await page.click("button[id='_confirm']");
+  // await page.waitFor(1000);
+
+  console.log("price before", getPriceData);
+  // console.log("price after", await price);
 
   return await page.waitFor(5000);
 }
 
 // Get Transactions
-async function getTransaction(res, page) {
+async function getTransaction(page) {
   await page.goto(
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
   );
 
   await page.waitFor(1000);
 
-  await page.screenshot({
-    path: "./public/images/page/page.png",
-    omitBackground: true
-  });
-
   try {
+    await page.waitFor(1000);
     const data = await page.evaluate(() => {
       return new Promise((resolve, reject) => {
         let table = document.querySelector("#_orderTable");
@@ -218,17 +278,16 @@ async function getTransaction(res, page) {
             result["match_amount"] = row[index].cells[11].textContent;
             result["validity"] = row[index].cells[12].textContent;
             result["channel"] = row[index].cells[13].textContent;
+            result["user_id"] = "3";
           }
 
           items.push(result);
         }
 
-        console.log(items);
-
         resolve(items);
       });
     });
-    console.log(data);
+    console.log("inner function ", data);
     return data;
   } catch (err) {
     return err;
@@ -372,9 +431,10 @@ async function setSettings(user_id, settings) {
   return setting;
 }
 
-// get spesify price
-async function getPrice(page, price_type) {
+// get spesify buy price
+async function getBuyPrice(page, price_type, level) {
   let price;
+  let dataPrice = [];
   if (price_type == "open") {
     price = await getOpenPrice(page);
   } else if (price_type == "prev") {
@@ -383,7 +443,31 @@ async function getPrice(page, price_type) {
     price = await getClosePrice(page);
   }
 
-  return price;
+  dataPrice[0] = await price;
+
+  // spread price by level per stock
+  for (let i = 1; i < level; i++) {
+    dataPrice[i] = dataPrice[i - 1] - 1;
+  }
+
+  return dataPrice;
+}
+
+// get spesify sell price
+async function getSellPrice(page, price_type, level) {
+  let price;
+  let dataPrice = [];
+  if (price_type == "open") {
+    price = await getOpenPrice(page);
+  } else if (price_type == "prev") {
+    price = await getPrevClosePrice(page);
+  } else {
+    price = await getClosePrice(page);
+  }
+
+  dataPrice = 1 + (await parseInt(await price));
+
+  return dataPrice;
 }
 
 // get open price
