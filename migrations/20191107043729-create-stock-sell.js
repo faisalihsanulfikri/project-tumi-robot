@@ -28,10 +28,16 @@ module.exports = {
       status: {
         type: Sequelize.STRING
       },
+      priceBuy: {
+        type: Sequelize.STRING
+      },
+      priceSell: {
+        type: Sequelize.STRING
+      },
       on_sale: {
         type: Sequelize.ENUM,
         values: ["yes", "no"],
-        defaultValue: "yes"
+        defaultValue: "no"
       },
       createdAt: {
         allowNull: false,

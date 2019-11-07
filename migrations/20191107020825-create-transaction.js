@@ -12,12 +12,12 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "stock",
+          model: "stocks",
           key: "id"
         }
       },
       mode: {
-        type : DataTypes.ENUM,
+        type : Sequelize.ENUM,
         values: [
           'buy',
           'sell',
@@ -43,7 +43,7 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       validity: {
-        type : DataTypes.ENUM,
+        type : Sequelize.ENUM,
         values: [
           'day',
           'session'
@@ -51,12 +51,20 @@ module.exports = {
         allowNull: true,        
       },
       status: {
-        type : DataTypes.ENUM,
+        type : Sequelize.ENUM,
         values: [
           'open',
           'matched'
         ],
         defaultValue: 'open'
+      },
+      user_id: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: "users",
+          key: "id"
+        }
       },
       createdAt: {
         allowNull: false,

@@ -8,10 +8,12 @@ module.exports = (sequelize, DataTypes) => {
       stock: DataTypes.STRING,
       mode: DataTypes.STRING,
       status: DataTypes.STRING,
+      priceBuy: DataTypes.STRING,
+      priceSell: DataTypes.STRING,
       on_sale: {
         type: DataTypes.ENUM,
         values: ["yes", "no"],
-        defaultValue: "yes"
+        defaultValue: "no"
       }
     },
     {
@@ -22,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
   Model.associate = function(models) {
     Model.belongsTo(models.User, {
       foreignKey: "user_id",
-      as: "users"
+      as: "User"
     });
   };
   return Model;

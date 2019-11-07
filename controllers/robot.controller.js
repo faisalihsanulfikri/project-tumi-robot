@@ -1,7 +1,8 @@
-const { User } = require("../models");
-const { Security } = require("../models");
-const { Robot } = require("../models");
 const { Master_Setting } = require("../models");
+const { Robot } = require("../models");
+const { Security } = require("../models");
+const { Stock_Sell } = require("../models");
+const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
@@ -28,6 +29,7 @@ module.exports.run = async function(req, res) {
   let username = thisUser.security_user_id;
   let password = thisUser.password;
   let pin = thisUser.pin;
+  let user_id = thisUser.user_id;
 
   /**
    * OPEN BROWSER
@@ -114,26 +116,25 @@ module.exports.run = async function(req, res) {
   /**
    * AUTOMATION BUY
    */
-  // let stocksBuy = [];
-  // for (let i = 0; i < stock_value_data.length; i++) {
-  //   for (let idx = 0; idx < level_per_stock; idx++) {
-  //     stocksBuy.push(
-  //       await stockBuy(
-  //         page,
-  //         price_type,
-  //         level_per_stock,
-  //         stock_value_data[i],
-  //         idx
-  //       )
-  //     );
-  //   }
-  // }
+  let stocksBuy = [];
+  for (let i = 0; i < stock_value_data.length; i++) {
+    for (let idx = 0; idx < level_per_stock; idx++) {
+      stocksBuy.push(
+        await stockBuy(
+          page,
+          price_type,
+          level_per_stock,
+          stock_value_data[i],
+          idx
+        )
+      );
+    }
+  }
 
-  // Promise.all(stocksBuy).then(() => {
-  //   console.log("finish buy!!!");
-  // });
-
-  // return;
+  // run buy stock
+  Promise.all(stocksBuy).then(() => {
+    console.log("finish buy!!!");
+  });
 
   /**
    * TRANSACTION
@@ -141,51 +142,57 @@ module.exports.run = async function(req, res) {
   let transaction = await getTransaction(page);
   await page.waitFor(1000);
 
+  /**
+   * AUTOMATION SELL
+   */
   let matchStockBuys = transaction.filter(el => {
     return el.mode == "Buy" && el.status == "Matched";
   });
 
-  /**
-   * AUTOMATION SELL
-   */
-
   if (matchStockBuys.length > 0) {
     let dataStockSell = matchStockBuys.map(el => {
       return {
+        order_id: el.order_id,
+        user_id: user_id,
         stock: el.stock,
         mode: el.mode,
+        status: el.status,
         priceBuy: el.price,
-        priceSell: (parseInt(el.price) + 1).toString(),
-        status: el.status
+        priceSell: (parseInt(el.price) + 1).toString()
       };
     });
+
+    // set data stock sell
+    let getDataStockSell = await setStockSell(dataStockSell);
 
     // stock sell
     let stocksSell = [];
     let stocksBuyAfterSell = [];
 
-    for (let i = 0; i < dataStockSell.length; i++) {
-      stocksSell.push(await stockSell(page, dataStockSell[i]));
+    for (let i = 0; i < getDataStockSell.length; i++) {
+      stocksSell.push(await stockSell(page, getDataStockSell[i]));
+
+      await updateStockSell(getDataStockSell[i]);
     }
 
-    for (let i = 0; i < dataStockSell.length; i++) {
-      stocksBuyAfterSell.push(await stockBuyAfterSell(page, dataStockSell[i]));
-    }
-
+    // run sell stock
     Promise.all(stocksSell).then(() => {
       console.log("stocksSell finish!!!");
     });
 
+    for (let i = 0; i < getDataStockSell.length; i++) {
+      stocksBuyAfterSell.push(
+        await stockBuyAfterSell(page, getDataStockSell[i])
+      );
+    }
+
+    // run buy after sel stock
     Promise.all(stocksBuyAfterSell).then(() => {
       console.log("stocksBuyAfterSell finish!!!");
     });
 
-    // Promise.all(stocksBuyAfterSell).then(() => {
-    //   console.log("stocksSell finish!!!");
-    // });
     return ReS(res, { transaction: await dataStockSell });
   }
-  // return;
 
   return;
 };
@@ -402,6 +409,45 @@ async function getUsers() {
   });
 
   return filter_data;
+}
+
+// set Stock Sell
+async function setStockSell(stockData) {
+  let err, stockSell;
+
+  stockData.forEach(async el => {
+    [err, stockSell] = await to(
+      Stock_Sell.findOne({ where: { order_id: el.order_id } })
+    );
+    if (!stockSell) {
+      console.log(el);
+      [err, stockSell] = await to(Stock_Sell.create(el));
+    } else {
+      stockSell.set(el);
+      [err, stockSell] = await to(stockSell.save());
+    }
+  });
+
+  [err, stockSell] = await to(Stock_Sell.findAll({ where: { on_sale: "no" } }));
+
+  return stockSell;
+}
+
+// update on sale stock
+async function updateStockSell(stockData) {
+  let err, stockSell;
+
+  let updateData = {
+    on_sale: "yes",
+    updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+  };
+
+  [err, stockSell] = await to(
+    Stock_Sell.findOne({ where: { order_id: stockData.order_id } })
+  );
+
+  stockSell.set(updateData);
+  [err, stockSell] = await to(stockSell.save());
 }
 
 // set Users settings
