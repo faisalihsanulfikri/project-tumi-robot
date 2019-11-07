@@ -20,11 +20,11 @@ module.exports = (sequelize, DataTypes) => {
   Model.associate = function(models) {
     Model.belongsTo(models.User, {
       foreignKey: "user_id",
-      as: "users"
+      as: "User"
     });
     Model.belongsTo(models.Security, {
       foreignKey: "security_id",
-      as: "securities"
+      as: "Security"
     });
   };
 
