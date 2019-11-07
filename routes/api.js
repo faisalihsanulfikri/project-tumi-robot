@@ -6,6 +6,7 @@ const SettingController = require("../controllers/setting.controller");
 const UserController = require("../controllers/user.controller");
 const TransactionController = require("../controllers/transaction.controller");
 const RobotController = require("../controllers/robot.controller");
+const PortofolioController = require("../controllers/portofolio.controller");
 
 const custom = require("./../middleware/custom");
 
@@ -68,6 +69,23 @@ router.post(
   UserController.userActivation
 );
 
+/**
+ * Portofolio
+ */
+router.get(
+  "/portofolio",
+  PortofolioController.portofolio
+);
+
+router.get(
+  "/get-portofolio",
+  PortofolioController.getPortofolio
+);
+
+router.post(
+  "/input-portofolio",
+  PortofolioController.inputPortofolio
+);
 /**
  * Security (Sekuritas)
  */
