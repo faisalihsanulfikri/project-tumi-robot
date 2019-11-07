@@ -40,7 +40,14 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     classMethods: {
       associate: function(models) {
-        // associations can be defined here
+        Model.belongsTo(models.User, {
+          foreignKey: "user_id",
+          as: "User"
+        });
+        Model.belongsTo(models.Stock, {
+          foreignKey: "stock_id",
+          as: "Stock"
+        });
       }
     }
   });
