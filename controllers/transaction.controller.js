@@ -112,7 +112,7 @@ module.exports.buyAndSell = async function(req, res) {
             } else if (result["status"] == 'Matched') {
               result["lots"] = result["match"]            
             }
-            result["order_amount"] = row[index].cells[10].textContent
+            result["order_amount"] = row[index].cells[10].textContent.replace(/,\s*/g, ""),
             result["match_amount"] = row[index].cells[11].textContent
             result["validity"] = row[index].cells[12].textContent
             result["channel"] = row[index].cells[13].textContent
@@ -196,7 +196,7 @@ module.exports.inputTransaction  = async function(req, res){
   const { Transaction } = require("../models")
 
     
-    let Datatransaction,transaction,err;
+    let Datatransaction,transaction,stock,err;
 
     let buyandsell = await module.exports.buyAndSell()
     
@@ -215,12 +215,15 @@ module.exports.inputTransaction  = async function(req, res){
   
     let user_id = thisUser.user_id;
 
-    let stock_id = 1;
-
+    
     buyandsell.forEach(async el => {
+      
+      [err, stock] = await to(Stock.findOne({ where: { name: el.stock } }));
+      // console.log(stock.dataValues)
       el.user_id = user_id;
-      el.stock_id = stock_id;
-        [err, transaction] = await to(Transaction.findOne({ where: { order_id: el.order_id } }));
+
+      el.stock_id = stock.dataValues.id;
+      [err, transaction] = await to(Transaction.findOne({ where: { order_id: el.order_id } }));
         if (!transaction) {
           console.log(el);
           [err, transaction] = await to(Transaction.create(el));
