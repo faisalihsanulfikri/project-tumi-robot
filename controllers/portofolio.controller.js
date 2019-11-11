@@ -250,16 +250,18 @@ module.exports.inputPortofolio = async function(req, res){
 module.exports.getPortofolio = async function(req, res){
     let portofolio
     let stock
-    let user_id = 2;
+    let user_id = req.params.user_id;
     [err, portofolio] = await to(Portofolio.findAll({ where: { user_id } }));
     // console.log(portofolio.length)
     let data = [];
     for (let i = 0; i < portofolio.length; i++) {
       const el = portofolio[i];
-     [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
+      [err, stock] = await to(Stock.findOne({ where: { id: el.stock_id } }))
      
-     data.push({...stock})
-     console.log(stock)
+    //  data.push({...stock})
+    if(stock){
+      data.push(stock.dataValues);
+    }
      
     }
     return ReS(res, { portfolio: portofolio.map(el=>el), Stocks: data })

@@ -78,7 +78,7 @@ router.get(
 );
 
 router.get(
-  "/get-portofolio",
+  "/get-portofolio/:user_id",
   PortofolioController.getPortofolio
 );
 
