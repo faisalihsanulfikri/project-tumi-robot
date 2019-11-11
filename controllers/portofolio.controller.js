@@ -208,7 +208,7 @@ module.exports.inputPortofolio = async function(req, res){
     const puppeteer = require("puppeteer");
     const { Portofolio } = require("../models")
 
-    let portofolio,getPortofolio,err;
+    let portofolio,getPortofolio,stock,err;
 
     getPortofolio = await module.exports.portofolio();
 
@@ -227,9 +227,16 @@ module.exports.inputPortofolio = async function(req, res){
       let user_id = thisUser.user_id;
 
     getPortofolio.forEach(async el => {
-        console.log(el)
+      let stocks = [err, stock] = await to(Stock.findOne({ where: { name: el.stock } }));
+      console.log(stocks)
+      // for (let i = 0; i < stocks.length; i++) {
+      //   const data = stocks[i];
+        
+      //   console.log(data)
+      // }
+        // el.stock_id = stock_id;
         el.user_id = user_id;
-        [err, portofolio] = await to(Portofolio.create(el));
+        // [err, portofolio] = await to(Portofolio.create(el));
         
     });
 
@@ -248,8 +255,8 @@ module.exports.getPortofolio = async function(req, res){
       const el = portofolio[i];
      [err, stock] = await to(Stock.findAll({ where: { id: el.stock_id } }))
      
-     data[i] = stock;
-    //  console.log(data)
+     data.push({...stock})
+     console.log(stock)
      
     }
     return ReS(res, { portfolio: portofolio.map(el=>el), Stocks: data })
