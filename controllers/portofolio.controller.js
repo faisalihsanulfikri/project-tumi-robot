@@ -227,16 +227,19 @@ module.exports.inputPortofolio = async function(req, res){
       let user_id = thisUser.user_id;
 
     getPortofolio.forEach(async el => {
-      let stocks = [err, stock] = await to(Stock.findOne({ where: { name: el.stock } }));
-      console.log(stocks)
-      // for (let i = 0; i < stocks.length; i++) {
-      //   const data = stocks[i];
-        
-      //   console.log(data)
-      // }
-        // el.stock_id = stock_id;
+      [err, portofolio] = await to(Portofolio.findOne({ where: { user_id: user_id } }));
+      [err, stock] = await to(Stock.findOne({ where: { name: el.stock } }));
+      // console.log(stock.dataValues.id)
+      if(el.stock){
+        el.stock_id = stock.dataValues.id;
+      }
         el.user_id = user_id;
-        // [err, portofolio] = await to(Portofolio.create(el));
+      if(!portofolio){
+          [err, portofolio] = await to(Portofolio.create(el));
+      }else {
+        portofolio.set(el);
+          [err, portofolio] = await to(portofolio.save());
+      }
         
     });
 
