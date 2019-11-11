@@ -1,7 +1,8 @@
-const { User } = require("../models");
-const { Security } = require("../models");
-const { Robot } = require("../models");
 const { Master_Setting } = require("../models");
+const { Robot } = require("../models");
+const { Security } = require("../models");
+const { Stock_Sell } = require("../models");
+const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
@@ -28,6 +29,7 @@ module.exports.run = async function(req, res) {
   let username = thisUser.security_user_id;
   let password = thisUser.password;
   let pin = thisUser.pin;
+  let user_id = thisUser.user_id;
 
   /**
    * OPEN BROWSER
@@ -35,6 +37,8 @@ module.exports.run = async function(req, res) {
   const browser = await puppeteer.launch({
     headless: false,
     defaultViewport: null
+    // executablePath:
+    //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   });
 
   /**
@@ -86,7 +90,7 @@ module.exports.run = async function(req, res) {
    * GET SETTING DATA FROM RHB
    */
   await page.goto(URL_protofolio);
-  await page.waitFor(500);
+  await page.waitFor(1000);
 
   let cost_total = await page.evaluate(
     () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
@@ -96,9 +100,8 @@ module.exports.run = async function(req, res) {
 
   let settings = await setSettings(thisUser.user_id, thisUser.setting);
 
-  // return ReS(res, { setting: settings });
-
   let price_type = await settings.price_type;
+  let level_per_stock = parseInt(await settings.level_per_stock);
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
 
@@ -113,49 +116,244 @@ module.exports.run = async function(req, res) {
   /**
    * AUTOMATION BUY
    */
-  let i = 0;
+  let stocksBuy = [];
+  for (let i = 0; i < stock_value_data.length; i++) {
+    for (let idx = 0; idx < level_per_stock; idx++) {
+      stocksBuy.push(
+        await stockBuy(
+          page,
+          price_type,
+          level_per_stock,
+          stock_value_data[i],
+          idx
+        )
+      );
+    }
+  }
 
-  let exec = setInterval(async function() {
-    if (i > 2) {
-      clearInterval(exec);
-    } else {
-      console.log("i ", i);
-      console.log("stock ", stock_value_data[i]);
-      await stockBuy(page, price_type, stock_value_data[i]);
-      console.log("finish");
+  // run buy stock
+  Promise.all(stocksBuy).then(() => {
+    console.log("finish buy!!!");
+  });
+
+  /**
+   * TRANSACTION
+   */
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
+
+  /**
+   * AUTOMATION SELL
+   */
+  let matchStockBuys = transaction.filter(el => {
+    return el.mode == "Buy" && el.status == "Matched";
+  });
+
+  if (matchStockBuys.length > 0) {
+    let dataStockSell = matchStockBuys.map(el => {
+      return {
+        order_id: el.order_id,
+        user_id: user_id,
+        stock: el.stock,
+        mode: el.mode,
+        status: el.status,
+        priceBuy: el.price,
+        priceSell: (parseInt(el.price) + 1).toString()
+      };
+    });
+
+    // set data stock sell
+    let getDataStockSell = await setStockSell(dataStockSell);
+
+    // stock sell
+    let stocksSell = [];
+    let stocksBuyAfterSell = [];
+
+    for (let i = 0; i < getDataStockSell.length; i++) {
+      stocksSell.push(await stockSell(page, getDataStockSell[i]));
+
+      await updateStockSell(getDataStockSell[i]);
     }
 
-    i++;
-  }, 5000);
+    // run sell stock
+    Promise.all(stocksSell).then(() => {
+      console.log("stocksSell finish!!!");
+    });
+
+    for (let i = 0; i < getDataStockSell.length; i++) {
+      stocksBuyAfterSell.push(
+        await stockBuyAfterSell(page, getDataStockSell[i])
+      );
+    }
+
+    // run buy after sel stock
+    Promise.all(stocksBuyAfterSell).then(() => {
+      console.log("stocksBuyAfterSell finish!!!");
+    });
+
+    return ReS(res, { transaction: await dataStockSell });
+  }
+
+  return;
 };
 
-async function stockBuy(page, price_type, stock) {
-  await page.goto(
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy"
-  );
+// Set Buy Stocks
+async function stockBuy(page, price_type, level, stock, i) {
+  const URL_orderpad_buy =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
+
+  console.log("stock ", stock);
+  await page.goto(URL_orderpad_buy);
+  await page.type("input[id='_stockCode']", stock);
+  await page.keyboard.press(String.fromCharCode(13));
+  await page.waitFor(4000);
+
+  let price = await getBuyPrice(page, price_type, level);
+
+  console.log("type ", price_type);
+
+  if (price[i] != "NaN") {
+    if (parseInt(price[i]) >= 50) {
+      await page.type("input[id='_volume']", "1");
+      await page.type("input[id='_price']", price[i]);
+      await page.click("button[id='_enter']");
+      await page.waitFor(1000);
+      await page.click("button[id='_confirm']");
+      await page.waitFor(1000);
+      console.log("=-=-=-=-=BUY=-=-=-=-=", parseInt(price[i]));
+    }
+  }
+
+  console.log("price ", await price);
+  console.log("price[] ", await price[i]);
+  console.log("finish");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// Set Sell Stocks
+async function stockSell(page, dataStockSell) {
+  const URL_orderpad_sell =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
+  let stock = dataStockSell.stock;
+  let priceSell = dataStockSell.priceSell;
+  let priceBuy = dataStockSell.priceBuy;
+  let lots = dataStockSell.lots;
+
+  console.log("stock ", stock);
+  console.log("priceBuy ", priceBuy);
+  console.log("priceSell ", priceSell);
+
+  await page.goto(URL_orderpad_sell);
+
   await page.type("input[id='_stockCode']", stock);
   await page.keyboard.press(String.fromCharCode(13));
   await page.waitFor(3000);
 
-  let price = await getPrice(page, price_type);
+  await page.type("input[id='_volume']", "1");
+  await page.type("input[id='_price']", priceSell);
+  await page.click("button[id='_enter']");
+  await page.waitFor(1000);
+  await page.click("button[id='_confirm']");
+  await page.waitFor(1000);
+  console.log("=-=-=-=-=SELL=-=-=-=-=", priceSell);
 
-  console.log("type ", price_type);
-  console.log("price ", price);
+  console.log("finish");
+  console.log("#############################################S");
 
-  if (price != "" && price != "&nbsp;") {
-    await page.type("input[id='_volume']", "1");
-    await page.type("input[id='_price']", price);
-    await page.click("button[id='_enter']");
-    await page.click("button[id='_confirm']");
+  return await page.waitFor(1000);
+}
+
+async function stockBuyAfterSell(page, dataStockSell) {
+  const URL_orderpad_buy =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
+
+  let stock = dataStockSell.stock;
+  let priceSell = dataStockSell.priceSell;
+  let priceBuy = dataStockSell.priceBuy;
+  let lots = dataStockSell.lots;
+
+  console.log("stock ", stock);
+  console.log("priceBuy ", priceBuy);
+  console.log("priceSell ", priceSell);
+
+  await page.goto(URL_orderpad_buy);
+  await page.type("input[id='_stockCode']", stock);
+  await page.keyboard.press(String.fromCharCode(13));
+  await page.waitFor(4000);
+
+  await page.type("input[id='_volume']", "1");
+  await page.type("input[id='_price']", priceBuy);
+  await page.click("button[id='_enter']");
+  await page.waitFor(1000);
+  await page.click("button[id='_confirm']");
+  await page.waitFor(1000);
+  console.log("=-=-=-=-=BUY AFTER SELL=-=-=-=-=", priceBuy);
+
+  console.log("finish");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// Get Transactions
+async function getTransaction(page) {
+  await page.goto(
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
+  );
+
+  await page.waitFor(1000);
+
+  try {
+    await page.waitFor(1000);
+    const data = await page.evaluate(() => {
+      return new Promise((resolve, reject) => {
+        let table = document.querySelector("#_orderTable");
+        let row = table.children;
+        let items = [];
+
+        for (let index = 0; index < row.length; index++) {
+          let result = {};
+
+          for (let i = 0; i < row[index].cells.length; i++) {
+            result["order_time"] = row[index].cells[1].textContent;
+            result["order_id"] = row[index].cells[2].textContent;
+            result["market"] = row[index].cells[3].textContent;
+            result["mode"] = row[index].cells[4].textContent;
+            result["stock"] = row[index].cells[5].textContent;
+            result["price"] = row[index].cells[6].textContent;
+            result["remain"] = row[index].cells[7].textContent;
+            result["match"] = row[index].cells[8].textContent;
+            result["status"] = row[index].cells[9].textContent;
+            if (result["status"] == "Open") {
+              result["lots"] = result["remain"];
+            } else if (result["status"] == "Matched") {
+              result["lots"] = result["match"];
+            }
+            result["order_amount"] = row[index].cells[10].textContent;
+            result["match_amount"] = row[index].cells[11].textContent;
+            result["validity"] = row[index].cells[12].textContent;
+            result["channel"] = row[index].cells[13].textContent;
+            result["user_id"] = "3";
+          }
+
+          items.push(result);
+        }
+
+        resolve(items);
+      });
+    });
+    console.log("inner function ", data);
+    return data;
+  } catch (err) {
+    return err;
   }
-
-  return await page.waitFor(5000);
 }
 
 // get Users
 async function getUsers() {
   let userData, securityData, robotData;
-
   [err, userData] = await to(User.findAll({ raw: true }));
   [err, securityData] = await to(Security.findAll({ raw: true }));
   [err, robotData] = await to(Robot.findAll({ raw: true }));
@@ -213,6 +411,46 @@ async function getUsers() {
   return filter_data;
 }
 
+// set Stock Sell
+async function setStockSell(stockData) {
+  let err, stockSell;
+
+  stockData.forEach(async el => {
+    [err, stockSell] = await to(
+      Stock_Sell.findOne({ where: { order_id: el.order_id } })
+    );
+    if (!stockSell) {
+      console.log(el);
+      [err, stockSell] = await to(Stock_Sell.create(el));
+    } else {
+      stockSell.set(el);
+      [err, stockSell] = await to(stockSell.save());
+    }
+  });
+
+  [err, stockSell] = await to(Stock_Sell.findAll({ where: { on_sale: "no" } }));
+
+  return stockSell;
+}
+
+// update on sale stock
+async function updateStockSell(stockData) {
+  let err, stockSell;
+
+  let updateData = {
+    on_sale: "yes",
+    updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+  };
+
+  [err, stockSell] = await to(
+    Stock_Sell.findOne({ where: { order_id: stockData.order_id } })
+  );
+
+  stockSell.set(updateData);
+  [err, stockSell] = await to(stockSell.save());
+}
+
+// set Users settings
 async function setSettings(user_id, settings) {
   let u_setting, m_setting, data, err;
 
@@ -270,7 +508,6 @@ async function setSettings(user_id, settings) {
       where: { user_id: user_id }
     })
   );
-
   [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
 
   let setting = {};
@@ -288,16 +525,30 @@ async function setSettings(user_id, settings) {
   return setting;
 }
 
-// get spesify price
-async function getPrice(page, price_type) {
+// get spesify buy price
+async function getBuyPrice(page, price_type, level) {
   let price;
+  let dataPrice = [];
   if (price_type == "open") {
     price = await getOpenPrice(page);
+  } else if (price_type == "prev") {
+    price = await getPrevClosePrice(page);
   } else {
-    price = await getPrevPrice(page);
+    price = await getClosePrice(page);
   }
 
-  return price;
+  dataPrice[0] = parseInt(await price);
+
+  // spread price by level per stock
+  for (let i = 1; i < level; i++) {
+    dataPrice[i] = dataPrice[i - 1] - 1;
+  }
+
+  for (let i = 0; i < level; i++) {
+    dataPrice[i] = dataPrice[i].toString();
+  }
+
+  return dataPrice;
 }
 
 // get open price
@@ -307,9 +558,16 @@ async function getOpenPrice(page) {
   );
 }
 
-// get prev price
-async function getPrevPrice(page) {
+// get prev close price
+async function getPrevClosePrice(page) {
   return await page.evaluate(
     () => document.querySelector("span[id='_prev']").innerHTML
+  );
+}
+
+// get close price
+async function getClosePrice(page) {
+  return await page.evaluate(
+    () => document.querySelector("td[id='_last']").innerHTML
   );
 }
