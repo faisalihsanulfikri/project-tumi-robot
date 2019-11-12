@@ -7,6 +7,7 @@ const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
 const moment = require("moment");
+const CronJob = require("cron").CronJob;
 
 module.exports.run = async function(req, res) {
   const puppeteer = require("puppeteer");
@@ -30,6 +31,8 @@ module.exports.run = async function(req, res) {
   let password = thisUser.password;
   let pin = thisUser.pin;
   let user_id = thisUser.user_id;
+
+  // return console.log("user_id luar cron", user_id);
 
   /**
    * OPEN BROWSER
@@ -114,13 +117,13 @@ module.exports.run = async function(req, res) {
   await page.click("input[id='_ltEnter']");
 
   /**
-   * AUTOMATION BUY
+   * AUTOMATION INITIATION BUY
    */
-  let stocksBuy = [];
+  let stocksInitBuy = [];
   for (let i = 0; i < stock_value_data.length; i++) {
     for (let idx = 0; idx < level_per_stock; idx++) {
-      stocksBuy.push(
-        await stockBuy(
+      stocksInitBuy.push(
+        await stockInitBuy(
           page,
           price_type,
           level_per_stock,
@@ -131,74 +134,114 @@ module.exports.run = async function(req, res) {
     }
   }
 
-  // run buy stock
-  Promise.all(stocksBuy).then(() => {
-    console.log("finish buy!!!");
+  // run initiation buy stock
+  Promise.all(stocksInitBuy).then(() => {
+    console.log("finish initiation buy!!!");
   });
 
   /**
-   * TRANSACTION
+   * AUTOMATION
    */
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
 
-  /**
-   * AUTOMATION SELL
-   */
-  let matchStockBuys = transaction.filter(el => {
-    return el.mode == "Buy" && el.status == "Matched";
+  const job = new CronJob("*/59 * * * * *", async function() {
+    /**
+     * TRANSACTION
+     */
+    let transaction = await getTransaction(page);
+    await page.waitFor(1000);
+    /**
+     * AUTOMATION SELL
+     */
+    let matchStockBuys = await transaction.filter(el => {
+      return el.mode == "Buy" && el.status == "Matched";
+    });
+    if (matchStockBuys.length > 0) {
+      await automationSells(page, matchStockBuys, user_id);
+    }
+    /**
+     * AUTOMATION BUY
+     */
+    let matchStockSells = await transaction.filter(el => {
+      return el.mode == "Sell" && el.status == "Matched";
+    });
+    if (matchStockSells.length > 0) {
+      await automationBuys(page, matchStockSells, user_id);
+    }
   });
 
-  if (matchStockBuys.length > 0) {
-    let dataStockSell = matchStockBuys.map(el => {
-      return {
-        order_id: el.order_id,
-        user_id: user_id,
-        stock: el.stock,
-        mode: el.mode,
-        status: el.status,
-        priceBuy: el.price,
-        priceSell: (parseInt(el.price) + 1).toString()
-      };
-    });
-
-    // set data stock sell
-    let getDataStockSell = await setStockSell(dataStockSell);
-
-    // stock sell
-    let stocksSell = [];
-    let stocksBuyAfterSell = [];
-
-    for (let i = 0; i < getDataStockSell.length; i++) {
-      stocksSell.push(await stockSell(page, getDataStockSell[i]));
-
-      await updateStockSell(getDataStockSell[i]);
-    }
-
-    // run sell stock
-    Promise.all(stocksSell).then(() => {
-      console.log("stocksSell finish!!!");
-    });
-
-    for (let i = 0; i < getDataStockSell.length; i++) {
-      stocksBuyAfterSell.push(
-        await stockBuyAfterSell(page, getDataStockSell[i])
-      );
-    }
-
-    // run buy after sel stock
-    Promise.all(stocksBuyAfterSell).then(() => {
-      console.log("stocksBuyAfterSell finish!!!");
-    });
-
-    return ReS(res, { transaction: await dataStockSell });
-  }
+  job.start();
 
   return;
 };
 
-// Set Buy Stocks
-async function stockBuy(page, price_type, level, stock, i) {
+// Automation Sells
+async function automationSells(page, matchStockBuys, user_id) {
+  let dataStockSell = await matchStockBuys.map(el => {
+    return {
+      order_id: el.order_id,
+      user_id: user_id,
+      stock: el.stock,
+      mode: el.mode,
+      status: el.status,
+      priceBuy: el.price,
+      priceSell: (parseInt(el.price) + 1).toString(),
+      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    };
+  });
+
+  // set data stock sell
+  let getDataStockSell = await setStockSell(await dataStockSell);
+  await page.waitFor(5000);
+
+  let stocksSell = [];
+
+  for (let i = 0; i < (await getDataStockSell.length); i++) {
+    stocksSell.push(await stockSell(page, await getDataStockSell[i]));
+    await updateStockTransaction(await getDataStockSell[i]);
+  }
+
+  // run sell stock
+  Promise.all(stocksSell).then(() => {
+    console.log("stocksSell finish!!!");
+  });
+}
+
+// Automation Buys
+async function automationBuys(page, matchStockSells, user_id) {
+  let dataStockBuy = await matchStockSells.map(el => {
+    return {
+      order_id: el.order_id,
+      user_id: user_id,
+      stock: el.stock,
+      mode: el.mode,
+      status: el.status,
+      priceBuy: el.price,
+      priceSell: (parseInt(el.price) + 1).toString(),
+      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    };
+  });
+
+  // set data stock buy
+  let getDataStockBuy = await setStockBuy(await dataStockBuy);
+  await page.waitFor(5000);
+
+  let stocksBuy = [];
+
+  for (let i = 0; i < (await getDataStockBuy.length); i++) {
+    stocksBuy.push(await stockBuy(page, await getDataStockBuy[i]));
+    await updateStockTransaction(await getDataStockBuy[i]);
+  }
+
+  // run buy stock
+  Promise.all(stocksBuy).then(() => {
+    console.log("stocksBuy finish!!!");
+  });
+}
+
+// Set Init Buy Stocks
+async function stockInitBuy(page, price_type, level, stock, i) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
@@ -265,14 +308,15 @@ async function stockSell(page, dataStockSell) {
   return await page.waitFor(1000);
 }
 
-async function stockBuyAfterSell(page, dataStockSell) {
+// Set Buy Stock
+async function stockBuy(page, dataStockBuy) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
-  let stock = dataStockSell.stock;
-  let priceSell = dataStockSell.priceSell;
-  let priceBuy = dataStockSell.priceBuy;
-  let lots = dataStockSell.lots;
+  let stock = dataStockBuy.stock;
+  let priceSell = dataStockBuy.priceSell;
+  let priceBuy = dataStockBuy.priceBuy;
+  let lots = dataStockBuy.lots;
 
   console.log("stock ", stock);
   console.log("priceBuy ", priceBuy);
@@ -289,7 +333,7 @@ async function stockBuyAfterSell(page, dataStockSell) {
   await page.waitFor(1000);
   await page.click("button[id='_confirm']");
   await page.waitFor(1000);
-  console.log("=-=-=-=-=BUY AFTER SELL=-=-=-=-=", priceBuy);
+  console.log("=-=-=-=-=BUY=-=-=-=-=", priceBuy);
 
   console.log("finish");
   console.log("##############################################");
@@ -408,7 +452,7 @@ async function getUsers() {
     return d.user_status == "active" && d.robot_status == "on";
   });
 
-  return filter_data;
+  return Promise.resolve(filter_data);
 }
 
 // set Stock Sell
@@ -428,13 +472,51 @@ async function setStockSell(stockData) {
     }
   });
 
-  [err, stockSell] = await to(Stock_Sell.findAll({ where: { on_sale: "no" } }));
+  [err, stockSell] = await to(
+    Stock_Sell.findAll({
+      where: {
+        mode: "Buy",
+        status: "Matched",
+        on_sale: "no"
+      }
+    })
+  );
 
   return stockSell;
 }
 
+// set Stock Buy
+async function setStockBuy(stockData) {
+  let err, stockBuy;
+
+  stockData.forEach(async el => {
+    [err, stockBuy] = await to(
+      Stock_Sell.findOne({ where: { order_id: el.order_id } })
+    );
+    if (!stockBuy) {
+      console.log(el);
+      [err, stockBuy] = await to(Stock_Sell.create(el));
+    } else {
+      stockBuy.set(el);
+      [err, stockBuy] = await to(stockBuy.save());
+    }
+  });
+
+  [err, stockBuy] = await to(
+    Stock_Sell.findAll({
+      where: {
+        mode: "Sell",
+        status: "Matched",
+        on_sale: "no"
+      }
+    })
+  );
+
+  return stockBuy;
+}
+
 // update on sale stock
-async function updateStockSell(stockData) {
+async function updateStockTransaction(stockData) {
   let err, stockSell;
 
   let updateData = {
