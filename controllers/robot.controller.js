@@ -6,14 +6,13 @@ const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
+const puppeteer = require("puppeteer");
+const Tesseract = require("../node_modules/tesseract.js");
+const fs = require("fs");
 const moment = require("moment");
 const CronJob = require("cron").CronJob;
 
 module.exports.run = async function(req, res) {
-  const puppeteer = require("puppeteer");
-  const Tesseract = require("../node_modules/tesseract.js");
-  const fs = require("fs");
-
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
   const URL_protofolio =
@@ -25,14 +24,10 @@ module.exports.run = async function(req, res) {
 
   let thisUser = users[0];
 
-  // return res.send(thisUser);
-
   let username = thisUser.security_user_id;
   let password = thisUser.password;
   let pin = thisUser.pin;
   let user_id = thisUser.user_id;
-
-  // return console.log("user_id luar cron", user_id);
 
   /**
    * OPEN BROWSER
@@ -51,130 +46,30 @@ module.exports.run = async function(req, res) {
   await page.goto(URL_login);
   await page.waitFor(2000);
 
-  /**
-   * LOGIN RHB
-   */
-  await page.type("input[id='j_username']", username);
-  await page.type("input[id='password']", password);
+  // LOGIN RHB
+  await login(page, username, password);
 
-  await page.waitForSelector("img[alt='athentication token']");
-  await page.evaluate(() => {
-    document.querySelector(".form-login").style.backgroundColor = "white";
-    document.querySelector("img[alt='athentication token']").style.transform =
-      "scale(2.2) skew(-60deg, 5deg)";
-    document.querySelector("img[alt='athentication token']").style.filter =
-      "grayscale(1) brightness(3) contrast(10)";
-  });
+  // LOGIN TRADING
+  await loginTrading(page, URL_runningTrade, pin);
 
-  let captcha = await page.$("img[alt='athentication token']");
-  await captcha.screenshot({
-    path: "./public/images/captcha/captcha.png",
-    omitBackground: true
-  });
-
-  let tokenCaptcha = await Tesseract.recognize(
-    "./public/images/captcha/captcha.png",
-    "eng",
-    {
-      logger: m => console.log(m)
-    }
-  ).then(({ data: { text } }) => {
-    token = text.replace(/\D+/g, "").trim();
-    token.toString().substring(0, 4);
-    return token;
-  });
-
-  console.log("token ", tokenCaptcha);
-
-  await page.type("input[id='j_token']", tokenCaptcha);
-  await page.click("button[type=submit]");
-
-  /**
-   * GET SETTING DATA FROM RHB
-   */
-  await page.goto(URL_protofolio);
-  await page.waitFor(1000);
-
-  let cost_total = await page.evaluate(
-    () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
-  );
-
-  thisUser.setting.cost_total = cost_total;
-
-  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+  // GET SETTING DATA FROM RHB
+  let settings = await getSettingData(page, URL_protofolio, thisUser);
 
   let price_type = await settings.price_type;
   let level_per_stock = parseInt(await settings.level_per_stock);
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
 
-  /**
-   * LOGIN TRADING
-   */
-  await page.goto(URL_runningTrade);
-  await page.click("button[onclick='objPopup.showLoginTrading();']");
-  await page.type("input[id='_ltPin']", pin);
-  await page.click("input[id='_ltEnter']");
+  // AUTOMATION INITIATION BUY
+  // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
-  /**
-   * AUTOMATION INITIATION BUY
-   */
-  let stocksInitBuy = [];
-  for (let i = 0; i < stock_value_data.length; i++) {
-    for (let idx = 0; idx < level_per_stock; idx++) {
-      stocksInitBuy.push(
-        await stockInitBuy(
-          page,
-          price_type,
-          level_per_stock,
-          stock_value_data[i],
-          idx
-        )
-      );
-    }
-  }
-
-  // run initiation buy stock
-  Promise.all(stocksInitBuy).then(() => {
-    console.log("finish initiation buy!!!");
-  });
-
-  /**
-   * AUTOMATION
-   */
-
-  const job = new CronJob("*/59 * * * * *", async function() {
-    /**
-     * TRANSACTION
-     */
-    let transaction = await getTransaction(page);
-    await page.waitFor(1000);
-    /**
-     * AUTOMATION SELL
-     */
-    let matchStockBuys = await transaction.filter(el => {
-      return el.mode == "Buy" && el.status == "Matched";
-    });
-    if (matchStockBuys.length > 0) {
-      await automationSells(page, matchStockBuys, user_id);
-    }
-    /**
-     * AUTOMATION BUY
-     */
-    let matchStockSells = await transaction.filter(el => {
-      return el.mode == "Sell" && el.status == "Matched";
-    });
-    if (matchStockSells.length > 0) {
-      await automationBuys(page, matchStockSells, user_id);
-    }
-  });
-
-  job.start();
+  // AUTOMATION
+  await automation(page);
 
   return;
 };
 
-// Automation Sells
+// automation sells
 async function automationSells(page, matchStockBuys, user_id) {
   let dataStockSell = await matchStockBuys.map(el => {
     return {
@@ -207,7 +102,7 @@ async function automationSells(page, matchStockBuys, user_id) {
   });
 }
 
-// Automation Buys
+// automation buys
 async function automationBuys(page, matchStockSells, user_id) {
   let dataStockBuy = await matchStockSells.map(el => {
     return {
@@ -240,7 +135,62 @@ async function automationBuys(page, matchStockSells, user_id) {
   });
 }
 
-// Set Init Buy Stocks
+// automation initiation buys
+async function automationInitBuys(
+  page,
+  price_type,
+  level_per_stock,
+  stock_value_data
+) {
+  let stocksInitBuy = [];
+  for (let i = 0; i < stock_value_data.length; i++) {
+    for (let idx = 0; idx < level_per_stock; idx++) {
+      stocksInitBuy.push(
+        await stockInitBuy(
+          page,
+          price_type,
+          level_per_stock,
+          stock_value_data[i],
+          idx
+        )
+      );
+    }
+  }
+
+  // run initiation buy stock
+  Promise.all(stocksInitBuy).then(() => {
+    console.log("finish initiation buy!!!");
+  });
+}
+
+// automation
+async function automation(page) {
+  const job = new CronJob("*/59 * * * * *", async function() {
+    // TRANSACTION
+    let transaction = await getTransaction(page);
+    await page.waitFor(1000);
+
+    // AUTOMATION SELL
+    let matchStockBuys = await transaction.filter(el => {
+      return el.mode == "Buy" && el.status == "Matched";
+    });
+    if (matchStockBuys.length > 0) {
+      await automationSells(page, matchStockBuys, user_id);
+    }
+
+    // AUTOMATION BUY
+    let matchStockSells = await transaction.filter(el => {
+      return el.mode == "Sell" && el.status == "Matched";
+    });
+    if (matchStockSells.length > 0) {
+      await automationBuys(page, matchStockSells, user_id);
+    }
+  });
+
+  job.start();
+}
+
+// set init buy stocks
 async function stockInitBuy(page, price_type, level, stock, i) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
@@ -275,7 +225,7 @@ async function stockInitBuy(page, price_type, level, stock, i) {
   return await page.waitFor(1000);
 }
 
-// Set Sell Stocks
+// set sell stocks
 async function stockSell(page, dataStockSell) {
   const URL_orderpad_sell =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
@@ -308,7 +258,7 @@ async function stockSell(page, dataStockSell) {
   return await page.waitFor(1000);
 }
 
-// Set Buy Stock
+// set buy stock
 async function stockBuy(page, dataStockBuy) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
@@ -341,7 +291,7 @@ async function stockBuy(page, dataStockBuy) {
   return await page.waitFor(1000);
 }
 
-// Get Transactions
+// get transactions
 async function getTransaction(page) {
   await page.goto(
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
@@ -455,7 +405,7 @@ async function getUsers() {
   return Promise.resolve(filter_data);
 }
 
-// set Stock Sell
+// set stock sell
 async function setStockSell(stockData) {
   let err, stockSell;
 
@@ -485,7 +435,7 @@ async function setStockSell(stockData) {
   return stockSell;
 }
 
-// set Stock Buy
+// set stock buy
 async function setStockBuy(stockData) {
   let err, stockBuy;
 
@@ -652,4 +602,66 @@ async function getClosePrice(page) {
   return await page.evaluate(
     () => document.querySelector("td[id='_last']").innerHTML
   );
+}
+
+// login
+async function login(page, username, password) {
+  await page.type("input[id='j_username']", username);
+  await page.type("input[id='password']", password);
+
+  await page.waitForSelector("img[alt='athentication token']");
+  await page.evaluate(() => {
+    document.querySelector(".form-login").style.backgroundColor = "white";
+    document.querySelector("img[alt='athentication token']").style.transform =
+      "scale(2.2) skew(-60deg, 5deg)";
+    document.querySelector("img[alt='athentication token']").style.filter =
+      "grayscale(1) brightness(3) contrast(10)";
+  });
+
+  let captcha = await page.$("img[alt='athentication token']");
+  await captcha.screenshot({
+    path: "./public/images/captcha/captcha.png",
+    omitBackground: true
+  });
+
+  let tokenCaptcha = await Tesseract.recognize(
+    "./public/images/captcha/captcha.png",
+    "eng",
+    {
+      logger: m => console.log(m)
+    }
+  ).then(({ data: { text } }) => {
+    token = text.replace(/\D+/g, "").trim();
+    token.toString().substring(0, 4);
+    return token;
+  });
+
+  console.log("token ", tokenCaptcha);
+
+  await page.type("input[id='j_token']", tokenCaptcha);
+  await page.click("button[type=submit]");
+}
+
+// login trading
+async function loginTrading(page, URL_runningTrade, pin) {
+  await page.goto(URL_runningTrade);
+  await page.click("button[onclick='objPopup.showLoginTrading();']");
+  await page.type("input[id='_ltPin']", pin);
+  await page.click("input[id='_ltEnter']");
+}
+
+// get setting data
+async function getSettingData(page, URL_protofolio, thisUser) {
+  await page.goto(URL_protofolio);
+  await page.waitFor(1000);
+
+  let cost_total = await page.evaluate(
+    () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
+  );
+
+  thisUser.setting.cost_total = cost_total;
+
+  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+
+  return await settings;
 }
