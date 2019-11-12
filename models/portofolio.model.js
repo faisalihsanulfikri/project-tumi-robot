@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
     cash_in_rdn: DataTypes.STRING,
     profit_lost: DataTypes.STRING,
     roi: DataTypes.STRING,
-    stock_id: DataTypes.INTEGER,
+    stock: DataTypes.STRING,
     avg_buy: DataTypes.STRING,
     last: DataTypes.STRING,
     ot: DataTypes.STRING,

@@ -29,12 +29,8 @@ module.exports = {
       roi: {
         type: Sequelize.STRING
       },
-      stock_id: {
-        type: Sequelize.INTEGER,
-        references: {
-          model: "stocks",
-          key: "id"
-        }
+      stock: {
+        type: Sequelize.STRING
       },
       avg_buy: {
         type: Sequelize.STRING

@@ -228,11 +228,7 @@ module.exports.inputPortofolio = async function(req, res){
 
     getPortofolio.forEach(async el => {
       [err, portofolio] = await to(Portofolio.findOne({ where: { user_id: user_id } }));
-      [err, stock] = await to(Stock.findOne({ where: { name: el.stock } }));
       // console.log(stock.dataValues.id)
-      if(el.stock){
-        el.stock_id = stock.dataValues.id;
-      }
         el.user_id = user_id;
       if(!portofolio){
           [err, portofolio] = await to(Portofolio.create(el));
@@ -249,21 +245,13 @@ module.exports.inputPortofolio = async function(req, res){
 
 module.exports.getPortofolio = async function(req, res){
     let portofolio
-    let stock
     let user_id = req.params.user_id;
     [err, portofolio] = await to(Portofolio.findAll({ where: { user_id } }));
     // console.log(portofolio.length)
-    let data = [];
     for (let i = 0; i < portofolio.length; i++) {
       const el = portofolio[i];
-      [err, stock] = await to(Stock.findOne({ where: { id: el.stock_id } }))
-     
-    //  data.push({...stock})
-    if(stock){
-      data.push(stock.dataValues);
-    }
      
     }
-    return ReS(res, { portfolio: portofolio.map(el=>el), Stocks: data })
+    return ReS(res, { portfolio: portofolio.map(el=>el) })
 }
   
