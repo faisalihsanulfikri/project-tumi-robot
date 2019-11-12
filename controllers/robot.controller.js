@@ -116,25 +116,27 @@ module.exports.run = async function(req, res) {
   /**
    * AUTOMATION BUY
    */
-  let stocksBuy = [];
-  for (let i = 0; i < stock_value_data.length; i++) {
-    for (let idx = 0; idx < level_per_stock; idx++) {
-      stocksBuy.push(
-        await stockBuy(
-          page,
-          price_type,
-          level_per_stock,
-          stock_value_data[i],
-          idx
-        )
-      );
-    }
-  }
+  // let stocksBuy = [];
+  // for (let i = 0; i < stock_value_data.length; i++) {
+  //   for (let idx = 0; idx < level_per_stock; idx++) {
+  //     stocksBuy.push(
+  //       await stockBuy(
+  //         page,
+  //         price_type,
+  //         level_per_stock,
+  //         stock_value_data[i],
+  //         idx
+  //       )
+  //     );
+  //   }
+  // }
 
-  // run buy stock
-  Promise.all(stocksBuy).then(() => {
-    console.log("finish buy!!!");
-  });
+  // // run buy stock
+  // Promise.all(stocksBuy).then(() => {
+  //   console.log("finish buy!!!");
+  // });
+
+  // return;
 
   /**
    * TRANSACTION
@@ -158,21 +160,28 @@ module.exports.run = async function(req, res) {
         mode: el.mode,
         status: el.status,
         priceBuy: el.price,
-        priceSell: (parseInt(el.price) + 1).toString()
+        priceSell: (parseInt(el.price) + 1).toString(),
+        createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+        updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
       };
     });
 
     // set data stock sell
     let getDataStockSell = await setStockSell(dataStockSell);
+    await page.waitFor(5000);
 
     // stock sell
     let stocksSell = [];
     let stocksBuyAfterSell = [];
 
-    for (let i = 0; i < getDataStockSell.length; i++) {
-      stocksSell.push(await stockSell(page, getDataStockSell[i]));
+    for (let i = 0; i < (await getDataStockSell.length); i++) {
+      stocksSell.push(await stockSell(page, await getDataStockSell[i]));
 
-      await updateStockSell(getDataStockSell[i]);
+      stocksBuyAfterSell.push(
+        await stockBuyAfterSell(page, await getDataStockSell[i])
+      );
+
+      await updateStockSell(await getDataStockSell[i]);
     }
 
     // run sell stock
@@ -180,11 +189,7 @@ module.exports.run = async function(req, res) {
       console.log("stocksSell finish!!!");
     });
 
-    for (let i = 0; i < getDataStockSell.length; i++) {
-      stocksBuyAfterSell.push(
-        await stockBuyAfterSell(page, getDataStockSell[i])
-      );
-    }
+    // for (let i = 0; i < (await getDataStockSell.length); i++) {}
 
     // run buy after sel stock
     Promise.all(stocksBuyAfterSell).then(() => {
