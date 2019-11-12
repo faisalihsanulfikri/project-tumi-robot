@@ -7,14 +7,8 @@ module.exports = {
       "master_settings",
       [
         {
-          config_name: "is_sell_by_time",
-          config_value: "true",
-          createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
-          updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
-        },
-        {
-          config_name: "min_value",
-          config_value: "1000",
+          config_name: "buy_time",
+          config_value: "09:00:00",
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
         }
