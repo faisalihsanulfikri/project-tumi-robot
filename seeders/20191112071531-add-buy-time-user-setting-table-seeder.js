@@ -7,15 +7,8 @@ module.exports = {
       "user_settings",
       [
         {
-          master_setting_id: 13,
-          config_value: "true",
-          user_id: 2,
-          createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
-          updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
-        },
-        {
-          master_setting_id: 14,
-          config_value: "1000",
+          master_setting_id: 15,
+          config_value: "09:00:00",
           user_id: 2,
           createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
