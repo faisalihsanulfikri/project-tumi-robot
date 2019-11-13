@@ -6,13 +6,13 @@ const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
+const puppeteer = require("puppeteer");
+const Tesseract = require("../node_modules/tesseract.js");
+const fs = require("fs");
 const moment = require("moment");
+const CronJob = require("cron").CronJob;
 
 module.exports.run = async function(req, res) {
-  const puppeteer = require("puppeteer");
-  const Tesseract = require("../node_modules/tesseract.js");
-  const fs = require("fs");
-
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
   const URL_protofolio =
@@ -23,8 +23,6 @@ module.exports.run = async function(req, res) {
   let users = await getUsers();
 
   let thisUser = users[0];
-
-  // return res.send(thisUser);
 
   let username = thisUser.security_user_id;
   let password = thisUser.password;
@@ -48,79 +46,107 @@ module.exports.run = async function(req, res) {
   await page.goto(URL_login);
   await page.waitFor(2000);
 
-  /**
-   * LOGIN RHB
-   */
-  await page.type("input[id='j_username']", username);
-  await page.type("input[id='password']", password);
+  // LOGIN RHB
+  await login(page, username, password);
 
-  await page.waitForSelector("img[alt='athentication token']");
-  await page.evaluate(() => {
-    document.querySelector(".form-login").style.backgroundColor = "white";
-    document.querySelector("img[alt='athentication token']").style.transform =
-      "scale(2.2) skew(-60deg, 5deg)";
-    document.querySelector("img[alt='athentication token']").style.filter =
-      "grayscale(1) brightness(3) contrast(10)";
-  });
+  // LOGIN TRADING
+  await loginTrading(page, URL_runningTrade, pin);
 
-  let captcha = await page.$("img[alt='athentication token']");
-  await captcha.screenshot({
-    path: "./public/images/captcha/captcha.png",
-    omitBackground: true
-  });
-
-  let tokenCaptcha = await Tesseract.recognize(
-    "./public/images/captcha/captcha.png",
-    "eng",
-    {
-      logger: m => console.log(m)
-    }
-  ).then(({ data: { text } }) => {
-    token = text.replace(/\D+/g, "").trim();
-    token.toString().substring(0, 4);
-    return token;
-  });
-
-  console.log("token ", tokenCaptcha);
-
-  await page.type("input[id='j_token']", tokenCaptcha);
-  await page.click("button[type=submit]");
-
-  /**
-   * GET SETTING DATA FROM RHB
-   */
-  await page.goto(URL_protofolio);
-  await page.waitFor(1000);
-
-  let cost_total = await page.evaluate(
-    () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
-  );
-
-  thisUser.setting.cost_total = cost_total;
-
-  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+  // GET SETTING DATA FROM RHB
+  let settings = await getSettingData(page, URL_protofolio, thisUser);
 
   let price_type = await settings.price_type;
   let level_per_stock = parseInt(await settings.level_per_stock);
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
 
-  /**
-   * LOGIN TRADING
-   */
-  await page.goto(URL_runningTrade);
-  await page.click("button[onclick='objPopup.showLoginTrading();']");
-  await page.type("input[id='_ltPin']", pin);
-  await page.click("input[id='_ltEnter']");
+  // AUTOMATION INITIATION BUY
+  // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
-  /**
-   * AUTOMATION BUY
-   */
+  // AUTOMATION
+  await automation(page);
+
+  return;
+};
+
+// automation sells
+async function automationSells(page, matchStockBuys, user_id) {
+  let dataStockSell = await matchStockBuys.map(el => {
+    return {
+      order_id: el.order_id,
+      user_id: user_id,
+      stock: el.stock,
+      mode: el.mode,
+      status: el.status,
+      priceBuy: el.price,
+      priceSell: (parseInt(el.price) + 1).toString(),
+      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    };
+  });
+
+  // set data stock sell
+  let getDataStockSell = await setStockSell(await dataStockSell);
+  await page.waitFor(5000);
+
+  let stocksSell = [];
+
+  for (let i = 0; i < (await getDataStockSell.length); i++) {
+    stocksSell.push(await stockSell(page, await getDataStockSell[i]));
+    await updateStockTransaction(await getDataStockSell[i]);
+  }
+
+  // run sell stock
+  Promise.all(stocksSell).then(() => {
+    console.log("stocksSell finish!!!");
+  });
+}
+
+// automation buys
+async function automationBuys(page, matchStockSells, user_id) {
+  let dataStockBuy = await matchStockSells.map(el => {
+    return {
+      order_id: el.order_id,
+      user_id: user_id,
+      stock: el.stock,
+      mode: el.mode,
+      status: el.status,
+      priceBuy: el.price,
+      priceSell: (parseInt(el.price) + 1).toString(),
+      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    };
+  });
+
+  // set data stock buy
+  let getDataStockBuy = await setStockBuy(await dataStockBuy);
+  await page.waitFor(5000);
+
   let stocksBuy = [];
+
+  for (let i = 0; i < (await getDataStockBuy.length); i++) {
+    stocksBuy.push(await stockBuy(page, await getDataStockBuy[i]));
+    await updateStockTransaction(await getDataStockBuy[i]);
+  }
+
+  // run buy stock
+  Promise.all(stocksBuy).then(() => {
+    console.log("stocksBuy finish!!!");
+  });
+}
+
+// automation initiation buys
+async function automationInitBuys(
+  page,
+  price_type,
+  level_per_stock,
+  stock_value_data
+) {
+  let stocksInitBuy = [];
   for (let i = 0; i < stock_value_data.length; i++) {
     for (let idx = 0; idx < level_per_stock; idx++) {
-      stocksBuy.push(
-        await stockBuy(
+      stocksInitBuy.push(
+        await stockInitBuy(
           page,
           price_type,
           level_per_stock,
@@ -131,74 +157,41 @@ module.exports.run = async function(req, res) {
     }
   }
 
-  // run buy stock
-  Promise.all(stocksBuy).then(() => {
-    console.log("finish buy!!!");
+  // run initiation buy stock
+  Promise.all(stocksInitBuy).then(() => {
+    console.log("finish initiation buy!!!");
   });
+}
 
-  /**
-   * TRANSACTION
-   */
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
+// automation
+async function automation(page) {
+  const job = new CronJob("*/59 * * * * *", async function() {
+    // TRANSACTION
+    let transaction = await getTransaction(page);
+    await page.waitFor(1000);
 
-  /**
-   * AUTOMATION SELL
-   */
-  let matchStockBuys = transaction.filter(el => {
-    return el.mode == "Buy" && el.status == "Matched";
-  });
-
-  if (matchStockBuys.length > 0) {
-    let dataStockSell = matchStockBuys.map(el => {
-      return {
-        order_id: el.order_id,
-        user_id: user_id,
-        stock: el.stock,
-        mode: el.mode,
-        status: el.status,
-        priceBuy: el.price,
-        priceSell: (parseInt(el.price) + 1).toString()
-      };
+    // AUTOMATION SELL
+    let matchStockBuys = await transaction.filter(el => {
+      return el.mode == "Buy" && el.status == "Matched";
     });
-
-    // set data stock sell
-    let getDataStockSell = await setStockSell(dataStockSell);
-
-    // stock sell
-    let stocksSell = [];
-    let stocksBuyAfterSell = [];
-
-    for (let i = 0; i < getDataStockSell.length; i++) {
-      stocksSell.push(await stockSell(page, getDataStockSell[i]));
-
-      await updateStockSell(getDataStockSell[i]);
+    if (matchStockBuys.length > 0) {
+      await automationSells(page, matchStockBuys, user_id);
     }
 
-    // run sell stock
-    Promise.all(stocksSell).then(() => {
-      console.log("stocksSell finish!!!");
+    // AUTOMATION BUY
+    let matchStockSells = await transaction.filter(el => {
+      return el.mode == "Sell" && el.status == "Matched";
     });
-
-    for (let i = 0; i < getDataStockSell.length; i++) {
-      stocksBuyAfterSell.push(
-        await stockBuyAfterSell(page, getDataStockSell[i])
-      );
+    if (matchStockSells.length > 0) {
+      await automationBuys(page, matchStockSells, user_id);
     }
+  });
 
-    // run buy after sel stock
-    Promise.all(stocksBuyAfterSell).then(() => {
-      console.log("stocksBuyAfterSell finish!!!");
-    });
+  job.start();
+}
 
-    return ReS(res, { transaction: await dataStockSell });
-  }
-
-  return;
-};
-
-// Set Buy Stocks
-async function stockBuy(page, price_type, level, stock, i) {
+// set init buy stocks
+async function stockInitBuy(page, price_type, level, stock, i) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
@@ -232,7 +225,7 @@ async function stockBuy(page, price_type, level, stock, i) {
   return await page.waitFor(1000);
 }
 
-// Set Sell Stocks
+// set sell stocks
 async function stockSell(page, dataStockSell) {
   const URL_orderpad_sell =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
@@ -265,14 +258,15 @@ async function stockSell(page, dataStockSell) {
   return await page.waitFor(1000);
 }
 
-async function stockBuyAfterSell(page, dataStockSell) {
+// set buy stock
+async function stockBuy(page, dataStockBuy) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
-  let stock = dataStockSell.stock;
-  let priceSell = dataStockSell.priceSell;
-  let priceBuy = dataStockSell.priceBuy;
-  let lots = dataStockSell.lots;
+  let stock = dataStockBuy.stock;
+  let priceSell = dataStockBuy.priceSell;
+  let priceBuy = dataStockBuy.priceBuy;
+  let lots = dataStockBuy.lots;
 
   console.log("stock ", stock);
   console.log("priceBuy ", priceBuy);
@@ -289,7 +283,7 @@ async function stockBuyAfterSell(page, dataStockSell) {
   await page.waitFor(1000);
   await page.click("button[id='_confirm']");
   await page.waitFor(1000);
-  console.log("=-=-=-=-=BUY AFTER SELL=-=-=-=-=", priceBuy);
+  console.log("=-=-=-=-=BUY=-=-=-=-=", priceBuy);
 
   console.log("finish");
   console.log("##############################################");
@@ -297,7 +291,7 @@ async function stockBuyAfterSell(page, dataStockSell) {
   return await page.waitFor(1000);
 }
 
-// Get Transactions
+// get transactions
 async function getTransaction(page) {
   await page.goto(
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
@@ -408,10 +402,10 @@ async function getUsers() {
     return d.user_status == "active" && d.robot_status == "on";
   });
 
-  return filter_data;
+  return Promise.resolve(filter_data);
 }
 
-// set Stock Sell
+// set stock sell
 async function setStockSell(stockData) {
   let err, stockSell;
 
@@ -428,13 +422,51 @@ async function setStockSell(stockData) {
     }
   });
 
-  [err, stockSell] = await to(Stock_Sell.findAll({ where: { on_sale: "no" } }));
+  [err, stockSell] = await to(
+    Stock_Sell.findAll({
+      where: {
+        mode: "Buy",
+        status: "Matched",
+        on_sale: "no"
+      }
+    })
+  );
 
   return stockSell;
 }
 
+// set stock buy
+async function setStockBuy(stockData) {
+  let err, stockBuy;
+
+  stockData.forEach(async el => {
+    [err, stockBuy] = await to(
+      Stock_Sell.findOne({ where: { order_id: el.order_id } })
+    );
+    if (!stockBuy) {
+      console.log(el);
+      [err, stockBuy] = await to(Stock_Sell.create(el));
+    } else {
+      stockBuy.set(el);
+      [err, stockBuy] = await to(stockBuy.save());
+    }
+  });
+
+  [err, stockBuy] = await to(
+    Stock_Sell.findAll({
+      where: {
+        mode: "Sell",
+        status: "Matched",
+        on_sale: "no"
+      }
+    })
+  );
+
+  return stockBuy;
+}
+
 // update on sale stock
-async function updateStockSell(stockData) {
+async function updateStockTransaction(stockData) {
   let err, stockSell;
 
   let updateData = {
@@ -570,4 +602,66 @@ async function getClosePrice(page) {
   return await page.evaluate(
     () => document.querySelector("td[id='_last']").innerHTML
   );
+}
+
+// login
+async function login(page, username, password) {
+  await page.type("input[id='j_username']", username);
+  await page.type("input[id='password']", password);
+
+  await page.waitForSelector("img[alt='athentication token']");
+  await page.evaluate(() => {
+    document.querySelector(".form-login").style.backgroundColor = "white";
+    document.querySelector("img[alt='athentication token']").style.transform =
+      "scale(2.2) skew(-60deg, 5deg)";
+    document.querySelector("img[alt='athentication token']").style.filter =
+      "grayscale(1) brightness(3) contrast(10)";
+  });
+
+  let captcha = await page.$("img[alt='athentication token']");
+  await captcha.screenshot({
+    path: "./public/images/captcha/captcha.png",
+    omitBackground: true
+  });
+
+  let tokenCaptcha = await Tesseract.recognize(
+    "./public/images/captcha/captcha.png",
+    "eng",
+    {
+      logger: m => console.log(m)
+    }
+  ).then(({ data: { text } }) => {
+    token = text.replace(/\D+/g, "").trim();
+    token.toString().substring(0, 4);
+    return token;
+  });
+
+  console.log("token ", tokenCaptcha);
+
+  await page.type("input[id='j_token']", tokenCaptcha);
+  await page.click("button[type=submit]");
+}
+
+// login trading
+async function loginTrading(page, URL_runningTrade, pin) {
+  await page.goto(URL_runningTrade);
+  await page.click("button[onclick='objPopup.showLoginTrading();']");
+  await page.type("input[id='_ltPin']", pin);
+  await page.click("input[id='_ltEnter']");
+}
+
+// get setting data
+async function getSettingData(page, URL_protofolio, thisUser) {
+  await page.goto(URL_protofolio);
+  await page.waitFor(1000);
+
+  let cost_total = await page.evaluate(
+    () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
+  );
+
+  thisUser.setting.cost_total = cost_total;
+
+  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+
+  return await settings;
 }

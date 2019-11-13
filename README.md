@@ -90,3 +90,15 @@ npx sequelize-cli seed:generate --name demo-user
 ```
 npx sequelize-cli db:seed:all
 ```
+
+```
+npx sequelize-cli db:seed --seed [filename-seed.js]
+```
+
+npx sequelize-cli db:seed --seed 20191112065619-add-min-value-sell-by-time-setting-table-seeder.js
+
+npx sequelize-cli db:seed --seed 20191112070131-add-min-value-sell-by-time-user-setting-table-seeder.js
+
+npx sequelize-cli db:seed --seed 20191112071415-add-buy-time-setting-table-seeder.js
+
+npx sequelize-cli db:seed --seed 20191112071531-add-buy-time-user-setting-table-seeder.js
