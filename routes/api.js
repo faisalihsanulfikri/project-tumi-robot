@@ -6,6 +6,7 @@ const SettingController = require("../controllers/setting.controller")
 const UserController = require("../controllers/user.controller")
 const TransactionController = require("../controllers/transaction.controller")
 const RobotController = require("../controllers/robot.controller")
+const SpreadsheetController = require('../controllers/spreadsheet.controller')
 
 const custom = require("./../middleware/custom")
 
@@ -143,6 +144,16 @@ router.delete(
   passport.authenticate("jwt", { session: false }),
   SettingController.remove
 )
+
+/**
+ * Get all stock from spreadsheet
+ */
+router.get('/spreadsheet', SpreadsheetController.getAllStocks)
+
+/**
+ * Get stocks from spreadsheet by sheet name
+ */
+router.get('/spreadsheet/:sheet', SpreadsheetController.getStocksBySheet)
 
 //********* API DOCUMENTATION **********
 router.use(

@@ -45,7 +45,7 @@ app.use((req, res, next) => {
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   )
-  res.header("X-Powered-By", "AndriyFM")
+  res.header("X-Powered-By", "WebhadeCreative")
   if (req.method === "OPTIONS") {
     res.header("Access-Control-Allow-Methods", "PUT, POST, PATCH, DELETE, GET")
     return res.status(200).json({})
@@ -54,7 +54,6 @@ app.use((req, res, next) => {
 })
 
 app.use("/api", api)
-app.use("/api/spreadsheet", require("./routes/spreadsheet"))
 
 app.use("/", function(req, res) {
   res.statusCode = 200 //send the appropriate status code
