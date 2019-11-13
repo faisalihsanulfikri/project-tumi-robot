@@ -1,7 +1,7 @@
 'use strict';
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define('Transaction', {
-    stock_id: DataTypes.INTEGER,
+    stock: DataTypes.STRING,
     mode: {
       type : DataTypes.ENUM,
       values: [
