@@ -43,6 +43,11 @@ module.exports.run = async function(req, res) {
    * OPEN RHB PAGE
    */
   const page = await browser.newPage();
+
+  page.on("dialog", async dialog => {
+    await dialog.accept();
+  });
+
   await page.goto(URL_login);
   await page.waitFor(2000);
 
@@ -93,7 +98,7 @@ module.exports.run = async function(req, res) {
 
     // filter sell transaction
     let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
-      return el.mode == "Buy";
+      return el.mode == "Sell";
     });
 
     if (withdrawStockSellData.length > 0) {
@@ -630,10 +635,8 @@ async function setWithdrawStockSell(page, withdrawData) {
   let steps = [];
 
   steps[0] = await page.click("img[onclick='objPopup.showPopupWithdraw(0);']");
-  steps[1] = await page.waitFor(2000);
-  steps[2] = await page.keyboard.press("Tab");
-  steps[3] = await page.waitFor(2000);
-  steps[4] = await page.keyboard.press("Enter");
+  steps[1] = await page.waitFor(500);
+  steps[2] = await page.click("input[onclick='objPopup.doPopupWithdraw();']");
 
   // run withdraw stock
   Promise.all(steps).then(() => {
