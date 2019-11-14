@@ -1,5 +1,5 @@
 const { to, ReE, ReS } = require("../services/util.service")
-const { Transaction } = require("../models")
+const { Portofolio } = require("../models")
 const { Stock } = require("../models")
 const { User } = require("../models");
 const { Security } = require("../models");
@@ -7,21 +7,10 @@ const { Robot } = require("../models");
 const { Master_Setting } = require("../models");
 const { User_Setting } = require("../models");
 
-module.exports.get_transaction = async function(req, res) {
-  let transaction
-  let stock
-  let user_id = req.params.user_id;
-  [err, transaction] = await to(Transaction.findAll({ where: { user_id } }));
-  
-  for (let i = 0; i < transaction.length; i++) {
-    const el = transaction[i];
 
-  }
-  return ReS(res, { transactions: transaction.map(el=>el) })
+// get protofolio
 
-}
-
-module.exports.buyAndSell = async function(req, res) {
+module.exports.portofolio = async function(req,res){
   const puppeteer = require("puppeteer")
   const Tesseract = require("../node_modules/tesseract.js")
   const fs = require("fs")
@@ -73,58 +62,87 @@ module.exports.buyAndSell = async function(req, res) {
   await page.click("button[type=submit]")
 
   await page.goto(
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/portfolio.jsp"
   )
   await page.click("button[onclick='objPopup.showLoginTrading();']")
   await page.type("input[id='_ltPin']", password)
   await page.click("input[id=_ltEnter]")
-  await page.click("button[id='_orderEnter']")
+  await page.click("button[id='_refresh']")
 
-  await page.waitFor(1000)
+  await page.waitFor(1000);
+  
+  const headData = {}
+  
+  let startingBalance = await page.evaluate(
+    () => document.querySelector("div[id='_startingBalance']").innerHTML
+    );
+    await page.waitFor(1000);
+    
+  let availableLimit = await page.evaluate(
+    () => document.querySelector("div[id='_availableLimit']").innerHTML
+    );
+    await page.waitFor(1000);
+    
+    let fundingAvailable = await page.evaluate(
+      () => document.querySelector("div[id='_fundingAvailable']").innerHTML
+    );
+    await page.waitFor(1000);
+    
+    let totalAsset = await page.evaluate(
+      () => document.querySelector("div[id='_totalAsset']").innerHTML
+    );
+    await page.waitFor(1000);
+    
+    let cashRdn = await page.evaluate(
+      () => document.querySelector("div[id='_cashRdn']").innerHTML
+    );
+    await page.waitFor(1000);
+      const item = [];
 
-  try {
-    const data = await page.evaluate(() => {
-      return new Promise((resolve, reject) => {
-        let table = document.querySelector("#_orderTable")
-        let row = table.children
-        let items = []
+        headData['starting_balance'] = await startingBalance.replace(/,\s*/g, ""), 
+        headData['available_limit'] = await availableLimit.replace(/,\s*/g, ""), 
+        headData['funding_available'] = await fundingAvailable.replace(/,\s*/g, ""), 
+        headData['total_asset'] = await totalAsset.replace(/,\s*/g, ""), 
+        headData['cash_in_rdn'] = await cashRdn.replace(/,\s*/g, ""), 
+        
+    item.push(headData);
 
-        for (let index = 0; index < row.length; index++) {
-          let result = {}
+  await page.waitFor(1000);
+  const table = await page.evaluate(() => {
+    return new Promise((resolve, reject) => {
+      let table = document.querySelector("#_portfolio")
+      let row = table.children
+      let items = []
+      let lenght = []
+      lenght = row.length - 1;
 
-          for (let i = 0; i < row[index].cells.length; i++) {
-            result["order_time"] = row[index].cells[1].textContent
-            result["order_id"] = row[index].cells[2].textContent
-            result["market"] = row[index].cells[3].textContent
-            result["mode"] = row[index].cells[4].textContent
-            result["stock"] = row[index].cells[5].textContent
-            result["price"] = row[index].cells[6].textContent
-            result["remain"] = row[index].cells[7].textContent
-            result["match"] = row[index].cells[8].textContent
-            result["status"] = row[index].cells[9].textContent
-            if (result["status"] == 'Open') {
-              result["lots"] = result["remain"]              
-            } else if (result["status"] == 'Matched') {
-              result["lots"] = result["match"]            
-            }
-            result["order_amount"] = row[index].cells[10].textContent.replace(/,\s*/g, ""),
-            result["match_amount"] = row[index].cells[11].textContent
-            result["validity"] = row[index].cells[12].textContent
-            result["channel"] = row[index].cells[13].textContent
-          }
+      for (let i = 0; i < lenght; i++) {
+        let result = {}
+        const tr = row[i];
+        const text = tr.children
+        if(!text[i].textContent){
 
-          items.push(result)
+        }else{
+          result["stock"] = text[0].textContent
+          result["avg_buy"] = text[1].textContent.replace(/,\s*/g, ""),
+          result["last"] = text[2].textContent
+          result["gross_value"] = text[6].textContent.replace(/,\s*/g, ""),
+          result["market_value"] = text[7].textContent.replace(/,\s*/g, ""),
+          result["pl_price"] = text[10].textContent.replace(/,\s*/g, ""),
+          result["pl_percent"] = text[11].textContent.replace(/,\s*/g, ""),
+
+
+        items.push(result)
         }
 
-        resolve(items)
-      })
+      }
+      resolve(items)
     })
-    // console.log(data)
+  })
+  const data = item.concat(table)
+
     return data
-  } catch (err) {
-    return (err)
-  }
-}
+};
 
 async function getUsers() {
   let userData, securityData, robotData;
@@ -186,49 +204,54 @@ async function getUsers() {
   return filter_data;
 }
 
-module.exports.inputTransaction  = async function(req, res){
-  const puppeteer = require("puppeteer");
-  const { Transaction } = require("../models")
+module.exports.inputPortofolio = async function(req, res){
+    const puppeteer = require("puppeteer");
+    const { Portofolio } = require("../models")
 
-    
-    let Datatransaction,transaction,stock,err;
+    let portofolio,getPortofolio,stock,err;
 
-    let buyandsell = await module.exports.buyAndSell()
-    
-    // console.log(buyandsell);
+    getPortofolio = await module.exports.portofolio();
 
     const browser = await puppeteer.launch({
-      headless: true,
-      defaultViewport: null
+        headless: true,
+        defaultViewport: null
+      });
+  
+      const page = await browser.newPage();
+      await page.waitFor(1000);
+
+      let users = await getUsers();
+
+      let thisUser = users[0];
+
+      let user_id = thisUser.user_id;
+
+    getPortofolio.forEach(async el => {
+      [err, portofolio] = await to(Portofolio.findOne({ where: { user_id: user_id } }));
+      // console.log(stock.dataValues.id)
+        el.user_id = user_id;
+      if(!portofolio){
+          [err, portofolio] = await to(Portofolio.create(el));
+      }else {
+        portofolio.set(el);
+          [err, portofolio] = await to(portofolio.save());
+      }
+        
     });
 
-    const page = await browser.newPage();
-    await page.waitFor(1000);
-    let users = await getUsers();
+    return ReS(res, { message: "Berhasil Input Portofilio" },201  );
 
-    let thisUser = users[0];
+}
+
+module.exports.getPortofolio = async function(req, res){
+    let portofolio
+    let user_id = req.params.user_id;
+    [err, portofolio] = await to(Portofolio.findAll({ where: { user_id } }));
+    // console.log(portofolio.length)
+    for (let i = 0; i < portofolio.length; i++) {
+      const el = portofolio[i];
+     
+    }
+    return ReS(res, { portfolio: portofolio.map(el=>el) })
+}
   
-    let user_id = thisUser.user_id;
-
-    buyandsell.forEach(async el => {
-      // console.log(el.stock)
-      // console.log(stock.dataValues)
-      el.user_id = user_id;
-
-      [err, transaction] = await to(Transaction.findOne({ where: { order_id: el.order_id } }));
-        if (!transaction) {
-          console.log(el);
-          [err, transaction] = await to(Transaction.create(el));
-          if (err) return ReE(res, err, 422);
-        }else{
-          transaction.set(el);
-          [err, transaction] = await to(transaction.save());
-          if (err) return ReE(res, err, 422);
-        }
-      });
-
-    await page.waitFor(2000);
-
-
-      return ReS(res, { message: "Berhasil Input Transaksi" },201  );
-};

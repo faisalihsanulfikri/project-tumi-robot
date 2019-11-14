@@ -1,37 +1,42 @@
-const express = require("express");
-const router = express.Router();
+const express = require("express")
+const router = express.Router()
 
 const SecurityController = require("../controllers/security.controller");
 const SettingController = require("../controllers/setting.controller");
 const UserController = require("../controllers/user.controller");
 const TransactionController = require("../controllers/transaction.controller");
 const RobotController = require("../controllers/robot.controller");
+const PortofolioController = require("../controllers/portofolio.controller");
+const SpreadsheetController = require('../controllers/spreadsheet.controller');
 
-const custom = require("./../middleware/custom");
+const custom = require("./../middleware/custom")
 
-const passport = require("passport");
-const path = require("path");
+const passport = require("passport")
+const path = require("path")
 
-require("./../middleware/passport")(passport);
+require("./../middleware/passport")(passport)
 /* GET home page. */
 router.get("/", function(req, res, next) {
   res.json({
     status: "success",
-    message: "Parcel Pending API",
+    message: "Parcel Pending API (TEST)",
     data: { version_number: "v1.0.0" }
-  });
-});
+  })
+})
 
 /**
  * authorization
  */
-router.post("/auth/register", UserController.register);
-router.post("/auth/login", UserController.login);
-router.post("/auth/login_admin", UserController.login_admin);
-router.post('/send_email_reset_password', UserController.send_email_reset_password);
-router.put('/reset_password/:reset_token',UserController.reset_password);
+router.post("/auth/register", UserController.register)
+router.post("/auth/login", UserController.login)
+router.post("/auth/login_admin", UserController.login_admin)
+router.post(
+  "/send_email_reset_password",
+  UserController.send_email_reset_password
+)
+router.put("/reset_password/:reset_token", UserController.reset_password)
 
-router.get("/run", RobotController.run);
+router.get("/run", RobotController.run)
 
 /**
  * user
@@ -40,34 +45,51 @@ router.put(
   "/users/change-password/:user_id",
   passport.authenticate("jwt", { session: false }),
   UserController.change_password
-);
+)
 
 router.get(
   "/users",
   passport.authenticate("jwt", { session: false }),
   UserController.getAll
-);
+)
 router.get(
   "/users/:user_id",
   passport.authenticate("jwt", { session: false }),
   UserController.get
-);
+)
 router.put(
   "/users/:user_id",
   passport.authenticate("jwt", { session: false }),
   UserController.update
-);
+)
 router.delete(
   "/users/:user_id",
   passport.authenticate("jwt", { session: false }),
   UserController.remove
-);
+)
 router.post(
   "/users/activation/:user_id",
   passport.authenticate("jwt", { session: false }),
   UserController.userActivation
+)
+
+/**
+ * Portofolio
+ */
+router.get(
+  "/portofolio",
+  PortofolioController.portofolio
 );
 
+router.get(
+  "/get-portofolio/:user_id",
+  PortofolioController.getPortofolio
+);
+
+router.post(
+  "/input-portofolio",
+  PortofolioController.inputPortofolio
+);
 /**
  * Security (Sekuritas)
  */
@@ -75,49 +97,42 @@ router.post(
   "/securities",
   passport.authenticate("jwt", { session: false }),
   SecurityController.create
-);
+)
 router.get(
   "/securities",
   passport.authenticate("jwt", { session: false }),
   SecurityController.getAll
-);
+)
 router.get(
   "/securities/:security_id",
   passport.authenticate("jwt", { session: false }),
   SecurityController.get
-);
+)
 router.get(
   "/securities/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SecurityController.getByUserId
-);
+)
 router.put(
   "/securities/:security_id",
   passport.authenticate("jwt", { session: false }),
   SecurityController.update
-);
+)
 router.delete(
   "/securities/:security_id",
   passport.authenticate("jwt", { session: false }),
   SecurityController.remove
-);
+)
 /*
-* transacsion (transaksi)
-*/
+ * transacsion (transaksi)
+ */
 router.get(
   "/get-transaction/:user_id",
   passport.authenticate("jwt", { session: false }),
   TransactionController.get_transaction
-);
-router.get(
-  "/buy-and-sell",
-  TransactionController.buyAndSell
-);
-router.post(
-  "/input-transaction",
-  TransactionController.inputTransaction
-);
-
+)
+router.get("/buy-and-sell", TransactionController.buyAndSell)
+router.post("/input-transaction", TransactionController.inputTransaction)
 
 /**
  * Setting
@@ -126,35 +141,45 @@ router.post(
   "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.create
-);
+)
 router.get(
   "/settings",
   passport.authenticate("jwt", { session: false }),
   SettingController.getAll
-);
+)
 router.get(
   "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.getByUserId
-);
+)
 router.put(
   "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.update
-);
+)
 router.delete(
   "/settings/user/:user_id",
   passport.authenticate("jwt", { session: false }),
   SettingController.remove
-);
+)
+
+/**
+ * Get all stock from spreadsheet
+ */
+router.get('/spreadsheet', SpreadsheetController.getAllStocks)
+
+/**
+ * Get stocks from spreadsheet by sheet name
+ */
+router.get('/spreadsheet/:sheet', SpreadsheetController.getStocksBySheet)
 
 //********* API DOCUMENTATION **********
 router.use(
   "/docs/api.json",
   express.static(path.join(__dirname, "/../public/v1/documentation/api.json"))
-);
+)
 router.use(
   "/docs",
   express.static(path.join(__dirname, "/../public/v1/documentation/dist"))
-);
-module.exports = router;
+)
+module.exports = router
