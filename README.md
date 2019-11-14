@@ -19,7 +19,7 @@ Fill in the variables to fit your application
 
 ```
 APP=dev
-PORT=3000
+PORT=3030
 
 DB_DIALECT=mysql
 DB_HOST=localhost
