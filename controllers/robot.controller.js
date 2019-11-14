@@ -64,7 +64,46 @@ module.exports.run = async function(req, res) {
   // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
   // AUTOMATION
-  await automation(page);
+  // await automation(page);
+
+  // SELL BY TIME
+  // await selByTime(page);
+
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
+
+  // AUTOMATION SELL
+  let openStockSells = await transaction.filter(el => {
+    return el.mode == "Sell" && el.status == "Open";
+  });
+
+  // get open stock
+  let stockOpen = await transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (stockOpen.length > 0) {
+    // set index into every element
+    let mapWithdrawStockSell = stockOpen.map((el, i) => {
+      return {
+        ...el,
+        index: i
+      };
+    });
+
+    // filter sell transaction
+    let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
+      return el.mode == "Buy";
+    });
+
+    if (withdrawStockSellData.length > 0) {
+      await automationWithdrawStockSell(page, withdrawStockSellData);
+    }
+
+    // if (openStockSells.length > 0) {
+    //   await automationSellByTimes(page, openStockSells, user_id);
+    // }
+  }
 
   return;
 };
@@ -86,7 +125,8 @@ async function automationSells(page, matchStockBuys, user_id) {
   });
 
   // set data stock sell
-  let getDataStockSell = await setStockSell(await dataStockSell);
+  await setStockSell(await dataStockSell);
+  let getDataStockSell = await getStockSell();
   await page.waitFor(5000);
 
   let stocksSell = [];
@@ -99,6 +139,58 @@ async function automationSells(page, matchStockBuys, user_id) {
   // run sell stock
   Promise.all(stocksSell).then(() => {
     console.log("stocksSell finish!!!");
+  });
+}
+
+// automation sells
+async function automationSellByTimes(page, openStockSells, user_id) {
+  let dataStockSellByTime = await openStockSells.map(el => {
+    return {
+      order_id: el.order_id,
+      user_id: user_id,
+      stock: el.stock,
+      mode: el.mode,
+      status: el.status,
+      priceBuy: el.price,
+      priceSell: (parseInt(el.price) + 1).toString(),
+      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    };
+  });
+
+  // set data stock sell by time
+  await setStockSell(await dataStockSellByTime);
+  let getDataStockSellByTime = await getStockSellByTime();
+  await page.waitFor(5000);
+
+  let stocksSellByTime = [];
+
+  for (let i = 0; i < (await getDataStockSellByTime.length); i++) {
+    stocksSellByTime.push(
+      await stockSellByTime(page, await getDataStockSellByTime[i])
+    );
+    await updateStockTransaction(await getDataStockSellByTime[i]);
+  }
+
+  // run sell stock
+  Promise.all(stocksSellByTime).then(() => {
+    console.log("stocksSellByTime finish!!!");
+  });
+}
+
+// automation withdraw stock sell
+async function automationWithdrawStockSell(page, withdrawData) {
+  let withdrawStockSell = [];
+
+  for (let i = 0; i < (await withdrawData.length); i++) {
+    withdrawStockSell.push(
+      await setWithdrawStockSell(page, await withdrawData[i])
+    );
+  }
+
+  // run withdraw stock
+  Promise.all(withdrawStockSell).then(() => {
+    console.log("withdrawStockSell finish!!!");
   });
 }
 
@@ -119,7 +211,8 @@ async function automationBuys(page, matchStockSells, user_id) {
   });
 
   // set data stock buy
-  let getDataStockBuy = await setStockBuy(await dataStockBuy);
+  await setStockBuy(await dataStockBuy);
+  let getDataStockBuy = await getStockBuy();
   await page.waitFor(5000);
 
   let stocksBuy = [];
@@ -251,6 +344,40 @@ async function stockSell(page, dataStockSell) {
   await page.click("button[id='_confirm']");
   await page.waitFor(1000);
   console.log("=-=-=-=-=SELL=-=-=-=-=", priceSell);
+
+  console.log("finish");
+  console.log("#############################################S");
+
+  return await page.waitFor(1000);
+}
+
+// set sell by time stocks
+async function stockSellByTime(page, dataStockSell) {
+  const URL_orderpad_sell =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
+  let stock = dataStockSell.stock;
+
+  console.log("stock ", stock);
+
+  await page.goto(URL_orderpad_sell);
+
+  await page.type("input[id='_stockCode']", stock);
+  await page.keyboard.press(String.fromCharCode(13));
+  await page.waitFor(3000);
+
+  let bidPrice = await getBidPrice(page);
+
+  console.log("type ", bidPrice);
+
+  if (bidPrice != "&nbsp;") {
+    await page.type("input[id='_volume']", "1");
+    await page.type("input[id='_price']", bidPrice);
+    await page.click("button[id='_enter']");
+    await page.waitFor(1000);
+    await page.click("button[id='_confirm']");
+    await page.waitFor(1000);
+    console.log("=-=-=-=-=SELL BY TIME=-=-=-=-=", bidPrice);
+  }
 
   console.log("finish");
   console.log("#############################################S");
@@ -421,12 +548,34 @@ async function setStockSell(stockData) {
       [err, stockSell] = await to(stockSell.save());
     }
   });
+}
+
+// get stock buy
+async function getStockSell() {
+  let err, stockSell;
 
   [err, stockSell] = await to(
     Stock_Sell.findAll({
       where: {
         mode: "Buy",
         status: "Matched",
+        on_sale: "no"
+      }
+    })
+  );
+
+  return stockSell;
+}
+
+// get stock buy
+async function getStockSellByTime() {
+  let err, stockSell;
+
+  [err, stockSell] = await to(
+    Stock_Sell.findAll({
+      where: {
+        mode: "Sell",
+        status: "open",
         on_sale: "no"
       }
     })
@@ -451,6 +600,11 @@ async function setStockBuy(stockData) {
       [err, stockBuy] = await to(stockBuy.save());
     }
   });
+}
+
+// get stock buy
+async function getStockBuy() {
+  let err, stockBuy;
 
   [err, stockBuy] = await to(
     Stock_Sell.findAll({
@@ -463,6 +617,30 @@ async function setStockBuy(stockData) {
   );
 
   return stockBuy;
+}
+
+// set withdraw stock sell
+async function setWithdrawStockSell(page, withdrawData) {
+  const URL_orderstatus =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp";
+
+  await page.goto(URL_orderstatus);
+  await page.waitFor(2000);
+
+  let steps = [];
+
+  steps[0] = await page.click("img[onclick='objPopup.showPopupWithdraw(0);']");
+  steps[1] = await page.waitFor(2000);
+  steps[2] = await page.keyboard.press("Tab");
+  steps[3] = await page.waitFor(2000);
+  steps[4] = await page.keyboard.press("Enter");
+
+  // run withdraw stock
+  Promise.all(steps).then(() => {
+    console.log("withdrawStockSell");
+  });
+
+  await page.waitFor(2000);
 }
 
 // update on sale stock
@@ -555,6 +733,13 @@ async function setSettings(user_id, settings) {
   });
 
   return setting;
+}
+
+// get spesify bid price
+async function getBidPrice(page) {
+  return await page.evaluate(
+    () => document.querySelector("td[id='_bidVal0']").innerHTML
+  );
 }
 
 // get spesify buy price

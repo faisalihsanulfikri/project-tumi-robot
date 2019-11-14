@@ -5,4 +5,4 @@
 package-lock.json
 
 # Disable public images captcha
-public/images/captcha
+public/images/captcha/captcha.png
