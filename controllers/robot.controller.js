@@ -627,12 +627,19 @@ async function setWithdrawStockSell(page, withdrawData) {
   await page.goto(URL_orderstatus);
   await page.waitFor(2000);
 
-  await page.click("img[onclick='objPopup.showPopupWithdraw(0);']");
-  await page.waitFor(1500);
-  await page.click("input[onclick='objPopup.doPopupWithdraw();']");
-  await page.waitFor(1500);
-  // await page.keyboard.press(String.fromCharCode(13));
-  await page.keyboard.press("Enter");
+  let steps = [];
+
+  steps[0] = await page.click("img[onclick='objPopup.showPopupWithdraw(0);']");
+  steps[1] = await page.waitFor(2000);
+  steps[2] = await page.keyboard.press("Tab");
+  steps[3] = await page.waitFor(2000);
+  steps[4] = await page.keyboard.press("Enter");
+
+  // run withdraw stock
+  Promise.all(steps).then(() => {
+    console.log("withdrawStockSell");
+  });
+
   await page.waitFor(2000);
 }
 
