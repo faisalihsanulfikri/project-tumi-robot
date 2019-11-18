@@ -12,6 +12,8 @@ const fs = require("fs");
 const moment = require("moment");
 const CronJob = require("cron").CronJob;
 
+let globalIndex = 0;
+
 module.exports.run = async function(req, res) {
   let robot_id = req.params.robot_id;
   const URL_login =
@@ -73,46 +75,12 @@ module.exports.run = async function(req, res) {
   // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
   // AUTOMATION
-  // await automation(page, user_id);
+  await automation(page, user_id);
   // return;
 
   // AUTOMATION SELL BY TIME
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
 
-  let openStockSells = await transaction.filter(el => {
-    return el.mode == "Sell" && el.status == "Open";
-  });
-
-  // get open stock
-  let stockOpen = await transaction.filter(el => {
-    return el.status == "Open";
-  });
-
-  if (stockOpen.length > 0) {
-    // set index into every element
-    let mapWithdrawStockSell = stockOpen.map((el, i) => {
-      return {
-        ...el,
-        index: i
-      };
-    });
-
-    // filter sell transaction
-    let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
-      return el.mode == "Sell";
-    });
-
-    if (withdrawStockSellData.length > 0) {
-      await automationWithdrawStockSell(page, mapWithdrawStockSell);
-    }
-
-    if (openStockSells.length > 0) {
-      await automationSellByTimes(page, openStockSells, user_id);
-    }
-  }
-
-  return;
+  return console.log("Robot has done");
 };
 
 // automation sells
@@ -200,13 +168,16 @@ async function automationSellByTimes(page, openStockSells, user_id) {
 }
 
 // automation withdraw stock sell
-async function automationWithdrawStockSell(page, mapWithdrawStockSell) {
+async function automationWithdrawStockSell(page, withdrawData) {
+  let data = await withdrawData;
   let withdrawStockSell = [];
 
-  for (let i = 0; i < (await withdrawData.length); i++) {
-    withdrawStockSell.push(
-      await setWithdrawStockSell(page, await withdrawData[i])
-    );
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (data[i].mode == "Sell") {
+      withdrawStockSell.push(
+        await setWithdrawStockSell(page, await data[i], i)
+      );
+    }
   }
 
   // run withdraw stock
@@ -296,6 +267,7 @@ async function automation(page, user_id) {
     let matchStockBuys = await transaction.filter(el => {
       return el.mode == "Buy" && el.status == "Matched";
     });
+
     if (matchStockBuys.length > 0) {
       await automationSells(page, matchStockBuys, user_id);
     }
@@ -304,12 +276,54 @@ async function automation(page, user_id) {
     let matchStockSells = await transaction.filter(el => {
       return el.mode == "Sell" && el.status == "Matched";
     });
+
     if (matchStockSells.length > 0) {
       await automationBuys(page, matchStockSells, user_id);
     }
+
+    if (1 == 2) {
+      await sellByTimeTrigger(page, user_id);
+      job.stop();
+    }
+
+    console.log("globalIndex = ", globalIndex);
+    globalIndex++;
   });
 
   job.start();
+}
+
+// sell by time trigger
+async function sellByTimeTrigger(page, user_id) {
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
+
+  let openStockSells = await transaction.filter(el => {
+    return el.mode == "Sell" && el.status == "Open";
+  });
+
+  // get open stock
+  let stockOpen = await transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (stockOpen.length > 0) {
+    // set index into every element
+    let mapWithdrawStockSell = stockOpen.map((el, i) => {
+      return {
+        ...el,
+        index: i
+      };
+    });
+
+    if (mapWithdrawStockSell.length > 0) {
+      await automationWithdrawStockSell(page, mapWithdrawStockSell);
+    }
+
+    if (openStockSells.length > 0) {
+      await automationSellByTimes(page, openStockSells, user_id);
+    }
+  }
 }
 
 // set init buy stocks
@@ -647,7 +661,7 @@ async function getStockBuy() {
 }
 
 // set withdraw stock sell
-async function setWithdrawStockSell(page, withdrawData) {
+async function setWithdrawStockSell(page, withdrawData, i) {
   const URL_orderstatus =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp";
 
@@ -656,7 +670,9 @@ async function setWithdrawStockSell(page, withdrawData) {
 
   let steps = [];
 
-  steps[0] = await page.click("img[onclick='objPopup.showPopupWithdraw(0);']");
+  steps[0] = await page.click(
+    "img[onclick='objPopup.showPopupWithdraw(" + i + ");']"
+  );
   steps[1] = await page.waitFor(500);
   steps[2] = await page.click("input[onclick='objPopup.doPopupWithdraw();']");
 
