@@ -13,6 +13,7 @@ const moment = require("moment");
 const CronJob = require("cron").CronJob;
 
 module.exports.run = async function(req, res) {
+  let robot_id = req.params.robot_id;
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
   const URL_protofolio =
@@ -20,9 +21,10 @@ module.exports.run = async function(req, res) {
   const URL_runningTrade =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp";
 
-  let users = await getUsers();
+  let thisUser = await getUsers(robot_id);
 
-  let thisUser = users[0];
+  // console.log("users", users);
+  // return res.json(users);
 
   let username = thisUser.security_user_id;
   let password = thisUser.password;
@@ -43,11 +45,18 @@ module.exports.run = async function(req, res) {
    * OPEN RHB PAGE
    */
   const page = await browser.newPage();
+
+  page.on("dialog", async dialog => {
+    await dialog.accept();
+  });
+
   await page.goto(URL_login);
   await page.waitFor(2000);
 
   // LOGIN RHB
-  await login(page, username, password);
+  await login(page, username, password, robot_id);
+
+  return;
 
   // LOGIN TRADING
   await loginTrading(page, URL_runningTrade, pin);
@@ -64,48 +73,49 @@ module.exports.run = async function(req, res) {
   // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
   // AUTOMATION
-  // await automation(page);
+  await automation(page, user_id);
+  // return;
 
   // SELL BY TIME
   // await selByTime(page);
 
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
+  // let transaction = await getTransaction(page);
+  // await page.waitFor(1000);
 
-  // AUTOMATION SELL
-  let openStockSells = await transaction.filter(el => {
-    return el.mode == "Sell" && el.status == "Open";
-  });
+  // // AUTOMATION SELL
+  // let openStockSells = await transaction.filter(el => {
+  //   return el.mode == "Buy" && el.status == "Open";
+  // });
 
-  // get open stock
-  let stockOpen = await transaction.filter(el => {
-    return el.status == "Open";
-  });
+  // // get open stock
+  // let stockOpen = await transaction.filter(el => {
+  //   return el.status == "Open";
+  // });
 
-  if (stockOpen.length > 0) {
-    // set index into every element
-    let mapWithdrawStockSell = stockOpen.map((el, i) => {
-      return {
-        ...el,
-        index: i
-      };
-    });
+  // if (stockOpen.length > 0) {
+  //   // set index into every element
+  //   let mapWithdrawStockSell = stockOpen.map((el, i) => {
+  //     return {
+  //       ...el,
+  //       index: i
+  //     };
+  //   });
 
-    // filter sell transaction
-    let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
-      return el.mode == "Buy";
-    });
+  //   // filter sell transaction
+  //   let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
+  //     return el.mode == "Sell";
+  //   });
 
-    if (withdrawStockSellData.length > 0) {
-      await automationWithdrawStockSell(page, withdrawStockSellData);
-    }
+  //   if (withdrawStockSellData.length > 0) {
+  //     await automationWithdrawStockSell(page, withdrawStockSellData);
+  //   }
 
-    // if (openStockSells.length > 0) {
-    //   await automationSellByTimes(page, openStockSells, user_id);
-    // }
-  }
+  //   if (openStockSells.length > 0) {
+  //     await automationSellByTimes(page, openStockSells, user_id);
+  //   }
+  // }
 
-  return;
+  // return;
 };
 
 // automation sells
@@ -158,24 +168,47 @@ async function automationSellByTimes(page, openStockSells, user_id) {
     };
   });
 
+  let dataDB = [];
+
+  // await setStockSell(await dataStockSellByTime);
+  dataDB[0] = setStockSell(await dataStockSellByTime);
+  dataDB[1] = await page.waitFor(2000);
+  dataDB[2] = getStockSellByTime();
+  dataDB[3] = console.log("dataDB", await dataDB[2]);
+  dataDB[4] = await page.waitFor(2000);
+
+  Promise.all(dataDB).then(() => {
+    console.log("stocksSellByTime finish!!!");
+  });
+
+  // await setStockSell(await dataStockSellByTime);
+  // dataDB = await getStockSellByTime();
+
   // set data stock sell by time
-  await setStockSell(await dataStockSellByTime);
-  let getDataStockSellByTime = await getStockSellByTime();
-  await page.waitFor(5000);
+  // await setStockSell(await dataStockSellByTime);
+  // let getDataStockSellByTime = await getStockSellByTime();
+  // await page.waitFor(5000);
+
+  // Promise.all(dataDB).then(() => {
+  //   console.log("dataDB set get finish!!!");
+  // });
+
+  // START
+
+  let dataSellStock = await dataDB[2];
 
   let stocksSellByTime = [];
 
-  for (let i = 0; i < (await getDataStockSellByTime.length); i++) {
-    stocksSellByTime.push(
-      await stockSellByTime(page, await getDataStockSellByTime[i])
-    );
-    await updateStockTransaction(await getDataStockSellByTime[i]);
+  for (let i = 0; i < (await dataSellStock.length); i++) {
+    stocksSellByTime.push(await stockSellByTime(page, await dataSellStock[i]));
+    await updateStockTransaction(await dataSellStock[i]);
   }
 
   // run sell stock
   Promise.all(stocksSellByTime).then(() => {
     console.log("stocksSellByTime finish!!!");
   });
+  // END
 }
 
 // automation withdraw stock sell
@@ -257,7 +290,7 @@ async function automationInitBuys(
 }
 
 // automation
-async function automation(page) {
+async function automation(page, user_id) {
   const job = new CronJob("*/59 * * * * *", async function() {
     // TRANSACTION
     let transaction = await getTransaction(page);
@@ -473,63 +506,59 @@ async function getTransaction(page) {
 }
 
 // get Users
-async function getUsers() {
+async function getUsers(robot_id) {
   let userData, securityData, robotData;
   [err, userData] = await to(User.findAll({ raw: true }));
   [err, securityData] = await to(Security.findAll({ raw: true }));
-  [err, robotData] = await to(Robot.findAll({ raw: true }));
+  [err, robotData] = await to(
+    Robot.findOne({ where: { id: robot_id, status: "on" } })
+  );
   [err, m_setting_data] = await to(Master_Setting.findAll({ raw: true }));
   [err, u_setting_data] = await to(User_Setting.findAll({ raw: true }));
 
-  let data = [];
+  let data = {};
   let config_name = "";
 
-  robotData.forEach((rd, i) => {
-    // get user
-    let filter_user = userData.filter(ud => {
-      return ud.id == rd.user_id;
-    });
-    // get security
-    let filter_security = securityData.filter(sd => {
-      return sd.id == rd.security_id;
-    });
-    // get setting
-    let filter_setting = u_setting_data.filter(usd => {
-      return usd.user_id == rd.user_id;
-    });
-
-    // filter setting
-    let dataSetting = {};
-    filter_setting.forEach(fs => {
-      m_setting_data.forEach(msd => {
-        if (msd.id == fs.master_setting_id) {
-          config_name = msd.config_name;
-        }
-      });
-      dataSetting[config_name] = fs.config_value;
-    });
-
-    data[i] = {
-      user_id: filter_user[0].id,
-      security_user_id: filter_security[0].username,
-      username: filter_user[0].username,
-      email: filter_user[0].email,
-      phone: filter_user[0].phone,
-      password: filter_security[0].password,
-      pin: filter_security[0].pin,
-      active_date: filter_security[0].active_date,
-      expire_date: filter_security[0].expire_date,
-      user_status: filter_user[0].status,
-      robot_status: rd.status,
-      setting: dataSetting
-    };
+  // get user
+  let filter_user = userData.filter(ud => {
+    return ud.id == robotData.user_id && ud.status == "active";
+  });
+  // get security
+  let filter_security = securityData.filter(sd => {
+    return sd.id == robotData.security_id;
+  });
+  // get setting
+  let filter_setting = u_setting_data.filter(usd => {
+    return usd.user_id == robotData.user_id;
   });
 
-  let filter_data = data.filter(d => {
-    return d.user_status == "active" && d.robot_status == "on";
+  // filter setting
+  let dataSetting = {};
+  filter_setting.forEach(fs => {
+    m_setting_data.forEach(msd => {
+      if (msd.id == fs.master_setting_id) {
+        config_name = msd.config_name;
+      }
+    });
+    dataSetting[config_name] = fs.config_value;
   });
 
-  return Promise.resolve(filter_data);
+  data = {
+    user_id: filter_user[0].id,
+    security_user_id: filter_security[0].username,
+    username: filter_user[0].username,
+    email: filter_user[0].email,
+    phone: filter_user[0].phone,
+    password: filter_security[0].password,
+    pin: filter_security[0].pin,
+    active_date: filter_security[0].active_date,
+    expire_date: filter_security[0].expire_date,
+    user_status: filter_user[0].status,
+    robot_status: robotData.status,
+    setting: dataSetting
+  };
+
+  return Promise.resolve(data);
 }
 
 // set stock sell
@@ -548,6 +577,8 @@ async function setStockSell(stockData) {
       [err, stockSell] = await to(stockSell.save());
     }
   });
+
+  return true;
 }
 
 // get stock buy
@@ -630,10 +661,8 @@ async function setWithdrawStockSell(page, withdrawData) {
   let steps = [];
 
   steps[0] = await page.click("img[onclick='objPopup.showPopupWithdraw(0);']");
-  steps[1] = await page.waitFor(2000);
-  steps[2] = await page.keyboard.press("Tab");
-  steps[3] = await page.waitFor(2000);
-  steps[4] = await page.keyboard.press("Enter");
+  steps[1] = await page.waitFor(500);
+  steps[2] = await page.click("input[onclick='objPopup.doPopupWithdraw();']");
 
   // run withdraw stock
   Promise.all(steps).then(() => {
@@ -790,7 +819,7 @@ async function getClosePrice(page) {
 }
 
 // login
-async function login(page, username, password) {
+async function login(page, username, password, robot_id) {
   await page.type("input[id='j_username']", username);
   await page.type("input[id='password']", password);
 
@@ -805,12 +834,12 @@ async function login(page, username, password) {
 
   let captcha = await page.$("img[alt='athentication token']");
   await captcha.screenshot({
-    path: "./public/images/captcha/captcha.png",
+    path: "./public/images/captcha/captcha" + robot_id + ".png",
     omitBackground: true
   });
 
   let tokenCaptcha = await Tesseract.recognize(
-    "./public/images/captcha/captcha.png",
+    "./public/images/captcha/captcha" + robot_id + ".png",
     "eng",
     {
       logger: m => console.log(m)
