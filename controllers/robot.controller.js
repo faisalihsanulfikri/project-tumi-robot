@@ -70,10 +70,10 @@ module.exports.run = async function(req, res) {
   let stock_value_data = await stock_value_string.split(",", 4);
 
   // AUTOMATION INITIATION BUY
-  // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
+  await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
   // AUTOMATION
-  await automation(page, user_id);
+  // await automation(page, user_id);
   // return;
 
   // SELL BY TIME
