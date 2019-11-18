@@ -13,6 +13,7 @@ const moment = require("moment");
 const CronJob = require("cron").CronJob;
 
 module.exports.run = async function(req, res) {
+  let robot_id = req.params.robot_id;
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
   const URL_protofolio =
@@ -20,7 +21,10 @@ module.exports.run = async function(req, res) {
   const URL_runningTrade =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp";
 
-  let users = await getUsers();
+  let users = await getUsers(robot_id);
+
+  console.log("users", users);
+  return res.json(users);
 
   let thisUser = users[0];
 
@@ -54,6 +58,8 @@ module.exports.run = async function(req, res) {
   // LOGIN RHB
   await login(page, username, password);
 
+  return;
+
   // LOGIN TRADING
   await loginTrading(page, URL_runningTrade, pin);
 
@@ -69,48 +75,49 @@ module.exports.run = async function(req, res) {
   // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
   // AUTOMATION
-  // await automation(page);
+  await automation(page, user_id);
+  // return;
 
   // SELL BY TIME
   // await selByTime(page);
 
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
+  // let transaction = await getTransaction(page);
+  // await page.waitFor(1000);
 
-  // AUTOMATION SELL
-  let openStockSells = await transaction.filter(el => {
-    return el.mode == "Sell" && el.status == "Open";
-  });
+  // // AUTOMATION SELL
+  // let openStockSells = await transaction.filter(el => {
+  //   return el.mode == "Buy" && el.status == "Open";
+  // });
 
-  // get open stock
-  let stockOpen = await transaction.filter(el => {
-    return el.status == "Open";
-  });
+  // // get open stock
+  // let stockOpen = await transaction.filter(el => {
+  //   return el.status == "Open";
+  // });
 
-  if (stockOpen.length > 0) {
-    // set index into every element
-    let mapWithdrawStockSell = stockOpen.map((el, i) => {
-      return {
-        ...el,
-        index: i
-      };
-    });
+  // if (stockOpen.length > 0) {
+  //   // set index into every element
+  //   let mapWithdrawStockSell = stockOpen.map((el, i) => {
+  //     return {
+  //       ...el,
+  //       index: i
+  //     };
+  //   });
 
-    // filter sell transaction
-    let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
-      return el.mode == "Sell";
-    });
+  //   // filter sell transaction
+  //   let withdrawStockSellData = mapWithdrawStockSell.filter(el => {
+  //     return el.mode == "Sell";
+  //   });
 
-    if (withdrawStockSellData.length > 0) {
-      await automationWithdrawStockSell(page, withdrawStockSellData);
-    }
+  //   if (withdrawStockSellData.length > 0) {
+  //     await automationWithdrawStockSell(page, withdrawStockSellData);
+  //   }
 
-    // if (openStockSells.length > 0) {
-    //   await automationSellByTimes(page, openStockSells, user_id);
-    // }
-  }
+  //   if (openStockSells.length > 0) {
+  //     await automationSellByTimes(page, openStockSells, user_id);
+  //   }
+  // }
 
-  return;
+  // return;
 };
 
 // automation sells
@@ -163,24 +170,47 @@ async function automationSellByTimes(page, openStockSells, user_id) {
     };
   });
 
+  let dataDB = [];
+
+  // await setStockSell(await dataStockSellByTime);
+  dataDB[0] = setStockSell(await dataStockSellByTime);
+  dataDB[1] = await page.waitFor(2000);
+  dataDB[2] = getStockSellByTime();
+  dataDB[3] = console.log("dataDB", await dataDB[2]);
+  dataDB[4] = await page.waitFor(2000);
+
+  Promise.all(dataDB).then(() => {
+    console.log("stocksSellByTime finish!!!");
+  });
+
+  // await setStockSell(await dataStockSellByTime);
+  // dataDB = await getStockSellByTime();
+
   // set data stock sell by time
-  await setStockSell(await dataStockSellByTime);
-  let getDataStockSellByTime = await getStockSellByTime();
-  await page.waitFor(5000);
+  // await setStockSell(await dataStockSellByTime);
+  // let getDataStockSellByTime = await getStockSellByTime();
+  // await page.waitFor(5000);
+
+  // Promise.all(dataDB).then(() => {
+  //   console.log("dataDB set get finish!!!");
+  // });
+
+  // START
+
+  let dataSellStock = await dataDB[2];
 
   let stocksSellByTime = [];
 
-  for (let i = 0; i < (await getDataStockSellByTime.length); i++) {
-    stocksSellByTime.push(
-      await stockSellByTime(page, await getDataStockSellByTime[i])
-    );
-    await updateStockTransaction(await getDataStockSellByTime[i]);
+  for (let i = 0; i < (await dataSellStock.length); i++) {
+    stocksSellByTime.push(await stockSellByTime(page, await dataSellStock[i]));
+    await updateStockTransaction(await dataSellStock[i]);
   }
 
   // run sell stock
   Promise.all(stocksSellByTime).then(() => {
     console.log("stocksSellByTime finish!!!");
   });
+  // END
 }
 
 // automation withdraw stock sell
@@ -262,7 +292,7 @@ async function automationInitBuys(
 }
 
 // automation
-async function automation(page) {
+async function automation(page, user_id) {
   const job = new CronJob("*/59 * * * * *", async function() {
     // TRANSACTION
     let transaction = await getTransaction(page);
@@ -478,11 +508,11 @@ async function getTransaction(page) {
 }
 
 // get Users
-async function getUsers() {
+async function getUsers(robot_id) {
   let userData, securityData, robotData;
   [err, userData] = await to(User.findAll({ raw: true }));
   [err, securityData] = await to(Security.findAll({ raw: true }));
-  [err, robotData] = await to(Robot.findAll({ raw: true }));
+  [err, robotData] = await to(Robot.findOne({ where: { id: robot_id } }));
   [err, m_setting_data] = await to(Master_Setting.findAll({ raw: true }));
   [err, u_setting_data] = await to(User_Setting.findAll({ raw: true }));
 
@@ -553,6 +583,8 @@ async function setStockSell(stockData) {
       [err, stockSell] = await to(stockSell.save());
     }
   });
+
+  return true;
 }
 
 // get stock buy

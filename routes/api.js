@@ -24,7 +24,7 @@ router.get("/", function(req, res, next) {
   });
 });
 
-router.get("/run", RobotController.run);
+router.post("/run/:robot_id", RobotController.run);
 
 //********* API DOCUMENTATION **********
 router.use(
