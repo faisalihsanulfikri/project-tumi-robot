@@ -24,10 +24,10 @@ router.get("/", function(req, res, next) {
   });
 });
 
-router.post("/run/:robot_id", RobotController.run);
+router.post("/robot/run/:robot_id", RobotController.run);
 
 // router.post(
-//   "/run/:robot_id",
+//   "/robot/run/:robot_id",
 //   passport.authenticate("jwt", { session: false }),
 //   RobotController.run
 // );
