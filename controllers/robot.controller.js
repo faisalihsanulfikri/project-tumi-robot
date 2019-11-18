@@ -25,9 +25,6 @@ module.exports.run = async function(req, res) {
 
   let thisUser = await getUsers(robot_id);
 
-  // console.log("users", users);
-  // return res.json(users);
-
   let username = thisUser.security_user_id;
   let password = thisUser.password;
   let pin = thisUser.pin;
@@ -58,7 +55,7 @@ module.exports.run = async function(req, res) {
   // LOGIN RHB
   await login(page, username, password, robot_id);
 
-  // return;
+  await updateRobotStatus(robot_id);
 
   // LOGIN TRADING
   await loginTrading(page, URL_runningTrade, pin);
@@ -520,9 +517,7 @@ async function getUsers(robot_id) {
   let userData, securityData, robotData;
   [err, userData] = await to(User.findAll({ raw: true }));
   [err, securityData] = await to(Security.findAll({ raw: true }));
-  [err, robotData] = await to(
-    Robot.findOne({ where: { id: robot_id, status: "on" } })
-  );
+  [err, robotData] = await to(Robot.findOne({ where: { id: robot_id } }));
   [err, m_setting_data] = await to(Master_Setting.findAll({ raw: true }));
   [err, u_setting_data] = await to(User_Setting.findAll({ raw: true }));
 
@@ -890,4 +885,16 @@ async function getSettingData(page, URL_protofolio, thisUser) {
   let settings = await setSettings(thisUser.user_id, thisUser.setting);
 
   return await settings;
+}
+
+async function updateRobotStatus(robot_id) {
+  let robot, data;
+
+  data = {
+    status: "on"
+  };
+
+  [err, robot] = await to(Robot.findOne({ where: { id: robot_id } }));
+  robot.set(data);
+  [err, robot] = await to(robot.save());
 }
