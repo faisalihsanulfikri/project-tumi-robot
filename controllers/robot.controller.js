@@ -55,29 +55,40 @@ module.exports.run = async function(req, res) {
   // LOGIN RHB
   await login(page, username, password, robot_id);
 
-  await updateRobotStatus(robot_id);
+  // set on robot status
+  await setOnRobotStatus(robot_id);
 
   // LOGIN TRADING
   await loginTrading(page, URL_runningTrade, pin);
 
-  // GET SETTING DATA FROM RHB
-  let settings = await getSettingData(page, URL_protofolio, thisUser);
+  // GET SETTING DATA
+  let settings = await getSettingData(user_id);
+
+  // GET SETTING DATA IF SELL BY TIME IS TRUE
+  if (settings.is_sell_by_time == "true") {
+    settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
+  }
 
   let price_type = await settings.price_type;
   let level_per_stock = parseInt(await settings.level_per_stock);
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
+  let cost_total = await settings.cost_total;
 
   // AUTOMATION INITIATION BUY
-  // await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
+  await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
 
   // AUTOMATION
-  await automation(page, user_id);
+  // await automation(res, page, browser, user_id, settings, robot_id);
   // return;
 
   // AUTOMATION SELL BY TIME
 
-  return console.log("Robot has done");
+  return res.json({
+    success: 1,
+    message: "Robot already run."
+  });
+  // setTimeout(function() {}, 500);
 };
 
 // automation sells
@@ -91,8 +102,8 @@ async function automationSells(page, matchStockBuys, user_id) {
       status: el.status,
       priceBuy: el.price,
       priceSell: (parseInt(el.price) + 1).toString(),
-      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
-      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+      createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
     };
   });
 
@@ -134,8 +145,8 @@ async function automationSellByTimes(page, openStockSells, user_id) {
       status: el.status,
       priceBuy: el.price,
       priceSell: (parseInt(el.price) + 1).toString(),
-      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
-      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+      createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
     };
   });
 
@@ -194,8 +205,8 @@ async function automationBuys(page, matchStockSells, user_id) {
       status: el.status,
       priceBuy: el.price,
       priceSell: (parseInt(el.price) + 1).toString(),
-      createdAt: moment().format("YYYY-MM-DD H:mm:ss"),
-      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+      createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
     };
   });
 
@@ -254,8 +265,14 @@ async function automationInitBuys(
 }
 
 // automation
-async function automation(page, user_id) {
+async function automation(res, page, browser, user_id, settings, robot_id) {
   const job = new CronJob("*/59 * * * * *", async function() {
+    // INNITIATION
+    let now = moment().format("HH:mm:ss");
+    let is_sell_by_time = settings.is_sell_by_time;
+    let getSellTtime = moment(settings.cl_time, "HH:mm:ss");
+    let sell_time = moment(getSellTtime).format("HH:mm:ss");
+
     // TRANSACTION
     let transaction = await getTransaction(page);
     await page.waitFor(1000);
@@ -278,9 +295,16 @@ async function automation(page, user_id) {
       await automationBuys(page, matchStockSells, user_id);
     }
 
-    if (1 == 2) {
-      await sellByTimeTrigger(page, user_id);
-      job.stop();
+    if (is_sell_by_time == "true") {
+      if (now > sell_time) {
+        let message = "Robot has done.";
+        await sellByTimeTrigger(page, user_id);
+
+        await setOffRobotStatus(robot_id, message);
+        await browser.close();
+        job.stop();
+        return;
+      }
     }
 
     console.log("globalIndex = ", globalIndex);
@@ -685,7 +709,7 @@ async function updateStockTransaction(stockData) {
 
   let updateData = {
     on_sale: "yes",
-    updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+    updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
   };
 
   [err, stockSell] = await to(
@@ -726,7 +750,7 @@ async function setSettings(user_id, settings) {
     element = i;
     updateData = {
       config_value: data[i],
-      updatedAt: moment().format("YYYY-MM-DD H:mm:ss")
+      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
     };
 
     // get master id setting
@@ -871,8 +895,8 @@ async function loginTrading(page, URL_runningTrade, pin) {
   await page.click("input[id='_ltEnter']");
 }
 
-// get setting data
-async function getSettingData(page, URL_protofolio, thisUser) {
+// get update setting data
+async function getUpdateSettingData(page, URL_protofolio, thisUser) {
   await page.goto(URL_protofolio);
   await page.waitFor(1000);
 
@@ -887,11 +911,52 @@ async function getSettingData(page, URL_protofolio, thisUser) {
   return await settings;
 }
 
-async function updateRobotStatus(robot_id) {
+// get setting data
+async function getSettingData(user_id) {
+  let u_setting, m_setting;
+
+  [err, u_setting] = await to(
+    User_Setting.findAll({ where: { user_id: user_id } })
+  );
+
+  [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
+
+  let setting = {};
+  let config_name = "";
+
+  u_setting.forEach(async (el, i) => {
+    m_setting.forEach(ms => {
+      if (ms.id == el.master_setting_id) {
+        config_name = ms.config_name;
+      }
+    });
+    setting[config_name] = el.config_value;
+  });
+
+  return setting;
+}
+
+// set on robot status
+async function setOnRobotStatus(robot_id) {
   let robot, data;
 
   data = {
-    status: "on"
+    status: "on",
+    off_message: null
+  };
+
+  [err, robot] = await to(Robot.findOne({ where: { id: robot_id } }));
+  robot.set(data);
+  [err, robot] = await to(robot.save());
+}
+
+// set off robot status
+async function setOffRobotStatus(robot_id, message) {
+  let robot, data;
+
+  data = {
+    status: "off",
+    off_message: message
   };
 
   [err, robot] = await to(Robot.findOne({ where: { id: robot_id } }));
