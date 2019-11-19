@@ -74,21 +74,36 @@ module.exports.run = async function(req, res) {
   let stock_value_string = await settings.stock_value;
   let stock_value_data = await stock_value_string.split(",", 4);
   let cost_total = await settings.cost_total;
+  let dana_per_stock = await settings.dana_per_stock;
 
   // AUTOMATION INITIATION BUY
-  await automationInitBuys(page, price_type, level_per_stock, stock_value_data);
+  // await automationInitBuys(
+  //   page,
+  //   price_type,
+  //   level_per_stock,
+  //   stock_value_data,
+  //   dana_per_stock
+  // );
 
   // AUTOMATION
-  // await automation(res, page, browser, user_id, settings, robot_id);
+  // await automation(
+  //   res,
+  //   page,
+  //   browser,
+  //   user_id,
+  //   settings,
+  //   robot_id,
+  //   URL_protofolio,
+  //   thisUser
+  // );
   // return;
 
-  // AUTOMATION SELL BY TIME
+  await setOffRobotStatus(robot_id, message);
 
   return res.json({
     success: 1,
     message: "Robot already run."
   });
-  // setTimeout(function() {}, 500);
 };
 
 // automation sells
@@ -241,7 +256,8 @@ async function automationInitBuys(
   page,
   price_type,
   level_per_stock,
-  stock_value_data
+  stock_value_data,
+  dana_per_stock
 ) {
   let stocksInitBuy = [];
   for (let i = 0; i < stock_value_data.length; i++) {
@@ -252,6 +268,7 @@ async function automationInitBuys(
           price_type,
           level_per_stock,
           stock_value_data[i],
+          dana_per_stock,
           idx
         )
       );
@@ -265,8 +282,17 @@ async function automationInitBuys(
 }
 
 // automation
-async function automation(res, page, browser, user_id, settings, robot_id) {
-  const job = new CronJob("*/59 * * * * *", async function() {
+async function automation(
+  res,
+  page,
+  browser,
+  user_id,
+  settings,
+  robot_id,
+  URL_protofolio,
+  thisUser
+) {
+  const job = new CronJob("*/2 * * * * *", async function() {
     // INNITIATION
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
@@ -297,12 +323,25 @@ async function automation(res, page, browser, user_id, settings, robot_id) {
 
     if (is_sell_by_time == "true") {
       if (now > sell_time) {
-        let message = "Robot has done.";
-        await sellByTimeTrigger(page, user_id);
-
-        await setOffRobotStatus(robot_id, message);
-        await browser.close();
         job.stop();
+
+        let message = "Robot has done.";
+        let exec = [];
+
+        exec[0] = await sellByTimeTrigger(page, user_id);
+        exec[1] = await page.waitFor(1500);
+        exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
+        exec[3] = await page.waitFor(1500);
+        exec[4] = await setOffRobotStatus(robot_id, message);
+        exec[5] = await page.waitFor(1500);
+        exec[6] = await browser.close();
+
+        Promise.all(exec).then(() => {
+          console.log(
+            "sellByTimeTrigger getUpdateSettingData setOffRobotStatus finish!!!"
+          );
+        });
+
         return;
       }
     }
@@ -348,7 +387,7 @@ async function sellByTimeTrigger(page, user_id) {
 }
 
 // set init buy stocks
-async function stockInitBuy(page, price_type, level, stock, i) {
+async function stockInitBuy(page, price_type, level, stock, dana_per_stock, i) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
@@ -358,14 +397,14 @@ async function stockInitBuy(page, price_type, level, stock, i) {
   await page.keyboard.press(String.fromCharCode(13));
   await page.waitFor(4000);
 
+  let stockBudget = dana_per_stock;
   let price = await getBuyPrice(page, price_type, level);
-
-  console.log("type ", price_type);
+  let lot = await getLot(stockBudget, level, price[i]);
 
   if (price[i] != "NaN") {
     if (parseInt(price[i]) >= 50) {
-      await page.type("input[id='_volume']", "1");
       await page.type("input[id='_price']", price[i]);
+      await page.type("input[id='_volume']", lot);
       await page.click("button[id='_enter']");
       await page.waitFor(1000);
       await page.click("button[id='_confirm']");
@@ -375,6 +414,7 @@ async function stockInitBuy(page, price_type, level, stock, i) {
   }
 
   console.log("price ", await price);
+  console.log("lot ", lot);
   console.log("price[] ", await price[i]);
   console.log("finish");
   console.log("##############################################");
@@ -529,7 +569,6 @@ async function getTransaction(page) {
         resolve(items);
       });
     });
-    console.log("inner function ", data);
     return data;
   } catch (err) {
     return err;
@@ -806,6 +845,7 @@ async function getBidPrice(page) {
 async function getBuyPrice(page, price_type, level) {
   let price;
   let dataPrice = [];
+  let spread = 0;
   if (price_type == "open") {
     price = await getOpenPrice(page);
   } else if (price_type == "prev") {
@@ -815,10 +855,12 @@ async function getBuyPrice(page, price_type, level) {
   }
 
   dataPrice[0] = parseInt(await price);
-
   // spread price by level per stock
+
+  spread = await getSpread(await dataPrice[0]);
+
   for (let i = 1; i < level; i++) {
-    dataPrice[i] = dataPrice[i - 1] - 1;
+    dataPrice[i] = dataPrice[i - 1] - (await spread);
   }
 
   for (let i = 0; i < level; i++) {
@@ -826,6 +868,25 @@ async function getBuyPrice(page, price_type, level) {
   }
 
   return dataPrice;
+}
+
+// get spread price
+async function getSpread(dataPrice) {
+  let spread = 0;
+
+  if (dataPrice < 200) {
+    spread = 1;
+  } else if (dataPrice < 500) {
+    spread = 2;
+  } else if (dataPrice < 2000) {
+    spread = 5;
+  } else if (dataPrice < 5000) {
+    spread = 10;
+  } else {
+    spread = 25;
+  }
+
+  return spread;
 }
 
 // get open price
@@ -847,6 +908,19 @@ async function getClosePrice(page) {
   return await page.evaluate(
     () => document.querySelector("td[id='_last']").innerHTML
   );
+}
+
+// get lot
+async function getLot(stockBudget, level, price) {
+  console.log("stockBudget, level, price", {
+    stockBudget: parseInt(stockBudget),
+    level: level,
+    price: parseInt(price)
+  });
+
+  return Math.round(
+    parseInt(stockBudget) / level / parseInt(price) / 100
+  ).toString();
 }
 
 // login
