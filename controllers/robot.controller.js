@@ -4,6 +4,7 @@ const { Security } = require("../models");
 const { Stock_Sell } = require("../models");
 const { User } = require("../models");
 const { User_Setting } = require("../models");
+const { User_Withdraw } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
 const puppeteer = require("puppeteer");
@@ -13,6 +14,8 @@ const moment = require("moment");
 const CronJob = require("cron").CronJob;
 
 let globalIndex = 0;
+let globalIndex1 = 0;
+let globalIndex2 = 0;
 
 module.exports.run = async function(req, res) {
   let robot_id = req.params.robot_id;
@@ -22,6 +25,8 @@ module.exports.run = async function(req, res) {
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/portfolio.jsp";
   const URL_runningTrade =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp";
+  const URL_accountinfo =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/accountinfo.jsp";
 
   let thisUser = await getUsers(robot_id);
 
@@ -54,8 +59,6 @@ module.exports.run = async function(req, res) {
 
   // LOGIN RHB
   await login(page, username, password, robot_id);
-
-  // set on robot status
   await setOnRobotStatus(robot_id);
 
   // LOGIN TRADING
@@ -76,35 +79,160 @@ module.exports.run = async function(req, res) {
   let cost_total = await settings.cost_total;
   let dana_per_stock = await settings.dana_per_stock;
 
-  // AUTOMATION INITIATION BUY
-  // await automationInitBuys(
-  //   page,
-  //   price_type,
-  //   level_per_stock,
-  //   stock_value_data,
-  //   dana_per_stock
-  // );
+  let wAmount = "1000";
+  // Withdraw acion
+  let dataGetWistdraw = await getWithdrawRhb(
+    page,
+    URL_accountinfo,
+    robot_id,
+    wAmount
+  );
 
-  // AUTOMATION
-  // await automation(
-  //   res,
-  //   page,
-  //   browser,
-  //   user_id,
-  //   settings,
-  //   robot_id,
-  //   URL_protofolio,
-  //   thisUser
-  // );
-  // return;
+  // await setWithdrawRhb(page, URL_accountinfo, robot_id, wAmount);
 
-  await setOffRobotStatus(robot_id, message);
+  await setOffRobotStatus(robot_id, "finish");
+
+  let dataWithdraw = await setObjectDataWithdraw(dataGetWistdraw, user_id);
+
+  let uWithdraw, err;
+
+  console.log("dataWithdraw", dataWithdraw);
+
+  return res.json({
+    dataWithdraw
+  });
+
+  // dataGetWistdraw.forEach(async el => {
+  //   let getRequestTime = await moment(el.request_time, "DD MMM YYYY");
+  //   let formatRequestTime = moment(await getRequestTime).format(
+  //     "YYYY-MM-DD HH:mm:ss"
+  //   );
+
+  //   let data = {
+  //     request_time: await formatRequestTime,
+  //     reference_no: el.reference_no,
+  //     amount: el.amount,
+  //     processed_at: el.processed_at,
+  //     status: el.status,
+  //     reason: el.reason,
+  //     user_id: user_id,
+  //     updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+  //   };
+
+  //   [err, uWithdraw] = await to(
+  //     User_Withdraw.findOne({
+  //       where: { reference_no: await data.reference_no }
+  //     })
+  //   );
+  //   if (!uWithdraw) {
+  //     console.log(await data);
+
+  //     [err, uWithdraw] = await to(User_Withdraw.create(await data));
+  //   } else {
+  //     uWithdraw.set(await data);
+  //     [err, uWithdraw] = await to(uWithdraw.save());
+  //   }
+  // });
+
+  console.log(await data);
+
+  return res.json({
+    dataGetWistdraw: await data
+  });
+  return;
+
+  /** START */
+
+  // validate buy time
+  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+    let now = moment().format("HH:mm:ss");
+    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+    let buy_time = moment(getBuyTime).format("HH:mm:ss");
+
+    console.log("now", now);
+    console.log("buy_time", buy_time);
+
+    if (now >= buy_time) {
+      isMoreThanBuyTime.stop();
+      // await setOffRobotStatus(robot_id, "Robot has done.");
+      // await browser.close();
+      await main(
+        res,
+        page,
+        browser,
+        user_id,
+        settings,
+        price_type,
+        level_per_stock,
+        stock_value_data,
+        dana_per_stock,
+        robot_id,
+        URL_protofolio,
+        thisUser
+      );
+
+      await setOffRobotStatus(robot_id, "finish");
+      console.log("FINISH !!!");
+      console.log("now", now);
+      console.log("buy_time", buy_time);
+    }
+  });
+
+  isMoreThanBuyTime.start();
+
+  /** END */
 
   return res.json({
     success: 1,
     message: "Robot already run."
   });
 };
+
+// main automation
+async function main(
+  res,
+  page,
+  browser,
+  user_id,
+  settings,
+  price_type,
+  level_per_stock,
+  stock_value_data,
+  dana_per_stock,
+  robot_id,
+  URL_protofolio,
+  thisUser
+) {
+  let mainExec = [];
+
+  // AUTOMATION INITIATION BUY
+  mainExec[0] = await automationInitBuys(
+    page,
+    price_type,
+    level_per_stock,
+    stock_value_data,
+    dana_per_stock
+  );
+
+  mainExec[1] = await page.waitFor(5000);
+  // AUTOMATION
+  mainExec[2] = await automation(
+    res,
+    page,
+    browser,
+    user_id,
+    settings,
+    robot_id,
+    URL_protofolio,
+    thisUser
+  );
+
+  Promise.all(mainExec).then(() => {
+    console.log("automationInitBuys automation finish!!!");
+  });
+
+  console.log("main automation");
+}
 
 // automation sells
 async function automationSells(page, matchStockBuys, user_id) {
@@ -292,7 +420,7 @@ async function automation(
   URL_protofolio,
   thisUser
 ) {
-  const job = new CronJob("*/2 * * * * *", async function() {
+  const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
@@ -341,8 +469,6 @@ async function automation(
             "sellByTimeTrigger getUpdateSettingData setOffRobotStatus finish!!!"
           );
         });
-
-        return;
       }
     }
 
@@ -560,7 +686,6 @@ async function getTransaction(page) {
             result["match_amount"] = row[index].cells[11].textContent;
             result["validity"] = row[index].cells[12].textContent;
             result["channel"] = row[index].cells[13].textContent;
-            result["user_id"] = "3";
           }
 
           items.push(result);
@@ -759,81 +884,6 @@ async function updateStockTransaction(stockData) {
   [err, stockSell] = await to(stockSell.save());
 }
 
-// set Users settings
-async function setSettings(user_id, settings) {
-  let u_setting, m_setting, data, err;
-
-  data = {
-    cost_total: await settings.cost_total.replace(/,\s*/g, ""),
-    fund_used: settings.fund_used,
-    max_stock: settings.max_stock,
-    dana_per_stock:
-      ((await settings.cost_total.replace(/,\s*/g, "")) *
-        (settings.fund_used / 100)) /
-      settings.max_stock,
-    level_per_stock: settings.level_per_stock,
-    spread_per_level: settings.spread_per_level,
-    profit_per_level: settings.profit_per_level,
-    stock_mode: settings.stock_mode,
-    stock_value: settings.stock_value,
-    cl_value: settings.cl_value,
-    cl_time: settings.cl_time,
-    price_type: settings.price_type
-  };
-
-  let updateData = {};
-  let element;
-
-  // update data
-  for (const i in await data) {
-    element = i;
-    updateData = {
-      config_value: data[i],
-      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-    };
-
-    // get master id setting
-    [err, m_setting] = await to(
-      Master_Setting.findOne({
-        where: { config_name: element }
-      })
-    );
-
-    // get data user setting
-    [err, u_setting] = await to(
-      User_Setting.findOne({
-        where: { user_id: user_id, master_setting_id: m_setting.id }
-      })
-    );
-
-    // update data user setting
-    u_setting.set(updateData);
-    [err, u_setting] = await to(u_setting.save());
-  }
-  // end update data
-
-  [err, u_setting] = await to(
-    User_Setting.findAll({
-      where: { user_id: user_id }
-    })
-  );
-  [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
-
-  let setting = {};
-  let config_name = "";
-
-  u_setting.forEach(async (el, i) => {
-    m_setting.forEach(ms => {
-      if (ms.id == el.master_setting_id) {
-        config_name = ms.config_name;
-      }
-    });
-    setting[config_name] = el.config_value;
-  });
-
-  return setting;
-}
-
 // get spesify bid price
 async function getBidPrice(page) {
   return await page.evaluate(
@@ -985,6 +1035,81 @@ async function getUpdateSettingData(page, URL_protofolio, thisUser) {
   return await settings;
 }
 
+// set Users settings
+async function setSettings(user_id, settings) {
+  let u_setting, m_setting, data, err;
+
+  data = {
+    cost_total: await settings.cost_total.replace(/,\s*/g, ""),
+    fund_used: settings.fund_used,
+    max_stock: settings.max_stock,
+    dana_per_stock:
+      ((await settings.cost_total.replace(/,\s*/g, "")) *
+        (settings.fund_used / 100)) /
+      settings.max_stock,
+    level_per_stock: settings.level_per_stock,
+    spread_per_level: settings.spread_per_level,
+    profit_per_level: settings.profit_per_level,
+    stock_mode: settings.stock_mode,
+    stock_value: settings.stock_value,
+    cl_value: settings.cl_value,
+    cl_time: settings.cl_time,
+    price_type: settings.price_type
+  };
+
+  let updateData = {};
+  let element;
+
+  // update data
+  for (const i in await data) {
+    element = i;
+    updateData = {
+      config_value: data[i],
+      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+    };
+
+    // get master id setting
+    [err, m_setting] = await to(
+      Master_Setting.findOne({
+        where: { config_name: element }
+      })
+    );
+
+    // get data user setting
+    [err, u_setting] = await to(
+      User_Setting.findOne({
+        where: { user_id: user_id, master_setting_id: m_setting.id }
+      })
+    );
+
+    // update data user setting
+    u_setting.set(updateData);
+    [err, u_setting] = await to(u_setting.save());
+  }
+  // end update data
+
+  [err, u_setting] = await to(
+    User_Setting.findAll({
+      where: { user_id: user_id }
+    })
+  );
+  [err, m_setting] = await to(Master_Setting.findAll({ raw: true }));
+
+  let setting = {};
+  let config_name = "";
+
+  u_setting.forEach(async (el, i) => {
+    m_setting.forEach(ms => {
+      if (ms.id == el.master_setting_id) {
+        config_name = ms.config_name;
+      }
+    });
+    setting[config_name] = el.config_value;
+  });
+
+  return setting;
+}
+
 // get setting data
 async function getSettingData(user_id) {
   let u_setting, m_setting;
@@ -1036,4 +1161,90 @@ async function setOffRobotStatus(robot_id, message) {
   [err, robot] = await to(Robot.findOne({ where: { id: robot_id } }));
   robot.set(data);
   [err, robot] = await to(robot.save());
+}
+
+// get withdraw data
+async function getWithdrawRhb(page, URL_accountinfo, robot_id, wAmount) {
+  await page.goto(URL_accountinfo);
+  await page.waitFor(1000);
+
+  await page.type("input[id='date-from']", "11/01/2019");
+  await page.waitFor(1000);
+  await page.click("button[onclick='loadWithdrawList();']");
+  await page.waitFor(1000);
+
+  try {
+    await page.waitFor(1000);
+    const data = await page.evaluate(() => {
+      return new Promise((resolve, reject) => {
+        let table = document.querySelector("#_requestTable");
+        let row = table.children;
+        let items = [];
+
+        for (let index = 0; index < row.length; index++) {
+          let result = {};
+
+          for (let i = 0; i < row[index].cells.length; i++) {
+            result["request_time"] = row[index].cells[0].textContent;
+            result["reference_no"] = row[index].cells[1].textContent;
+            result["amount"] = row[index].cells[2].textContent;
+            result["processed_at"] = row[index].cells[3].textContent;
+            result["status"] = row[index].cells[4].textContent;
+            result["reason"] = row[index].cells[5].textContent;
+          }
+
+          items.push(result);
+        }
+
+        resolve(items);
+      });
+    });
+    return data;
+  } catch (err) {
+    await setOffRobotStatus(robot_id, "fail get withdraw data");
+    return err;
+  }
+}
+
+// set withdraw
+async function setWithdrawRhb(page, URL_accountinfo, robot_id, wAmount) {
+  await page.goto(URL_accountinfo);
+  await page.waitFor(1000);
+
+  await page.type("input[id='_amount']", wAmount);
+  await page.waitFor(1000);
+  await page.click("button[onclick='saveWithdrawCommand();']");
+  await page.waitFor(1000);
+}
+
+// set object data withdraw
+async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
+  let dataWithdraw = [];
+
+  dataGetWistdraw.forEach(el => {
+    let getRequestTime = moment(el.request_time, "DD MMM YYYY");
+    let formatRequestTime = moment(getRequestTime).format(
+      "YYYY-MM-DD HH:mm:ss"
+    );
+
+    let getProcessedAt = moment(el.processed_at, "DD MMM YYYY HH:mm");
+    let formatProcessedAt = moment(getProcessedAt).format(
+      "YYYY-MM-DD HH:mm:ss"
+    );
+
+    let amount = el.amount.replace(/,\s*/g, "");
+
+    dataWithdraw = {
+      request_time: formatRequestTime,
+      reference_no: el.reference_no,
+      amount: amount,
+      processed_at: formatProcessedAt,
+      status: el.status,
+      reason: el.reason,
+      user_id: user_id,
+      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+    };
+  });
+
+  return dataWithdraw;
 }
