@@ -85,7 +85,7 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
-  await automationSetWithdrawRhb(page, URL_accountinfo, robot_id, user_id);
+  // await automationSetWithdrawRhb(page, URL_accountinfo, robot_id, user_id);
 
   // return;
 
@@ -94,43 +94,43 @@ module.exports.run = async function(req, res) {
   /** START */
 
   // validate buy time
-  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-    let now = moment().format("HH:mm:ss");
-    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-    let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+  //   let now = moment().format("HH:mm:ss");
+  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-    console.log("now", now);
-    console.log("buy_time", buy_time);
+  //   console.log("now", now);
+  //   console.log("buy_time", buy_time);
 
-    if (now >= buy_time) {
-      isMoreThanBuyTime.stop();
-      // await setOffRobotStatus(robot_id, "Robot has done.");
-      // await browser.close();
-      // await main(
-      //   res,
-      //   page,
-      //   browser,
-      //   user_id,
-      //   settings,
-      //   price_type,
-      //   level_per_stock,
-      //   stock_value_data,
-      //   dana_per_stock,
-      //   robot_id,
-      //   URL_protofolio,
-      //   thisUser,
-      //   URL_accountinfo,
-      //   spreadPerLevel
-      // );
+  //   if (now >= buy_time) {
+  //     isMoreThanBuyTime.stop();
+  //     // await setOffRobotStatus(robot_id, "Robot has done.");
+  //     // await browser.close();
+  //     // await main(
+  //     //   res,
+  //     //   page,
+  //     //   browser,
+  //     //   user_id,
+  //     //   settings,
+  //     //   price_type,
+  //     //   level_per_stock,
+  //     //   stock_value_data,
+  //     //   dana_per_stock,
+  //     //   robot_id,
+  //     //   URL_protofolio,
+  //     //   thisUser,
+  //     //   URL_accountinfo,
+  //     //   spreadPerLevel
+  //     // );
 
-      await setOffRobotStatus(robot_id, "finish");
-      console.log("FINISH !!!");
-      console.log("now", now);
-      console.log("buy_time", buy_time);
-    }
-  });
+  //     await setOffRobotStatus(robot_id, "finish");
+  //     console.log("FINISH !!!");
+  //     console.log("now", now);
+  //     console.log("buy_time", buy_time);
+  //   }
+  // });
 
-  isMoreThanBuyTime.start();
+  // isMoreThanBuyTime.start();
 
   /** END */
 
@@ -1284,7 +1284,7 @@ async function getWithdrawData(user_id) {
   let err, requrstWithdraw;
 
   [err, requrstWithdraw] = await to(
-    Withdraw.findAll({ where: { user_id: user_id } })
+    Withdraw.findAll({ where: { user_id: user_id, on_submit: "no" } })
   );
 
   return requrstWithdraw;
