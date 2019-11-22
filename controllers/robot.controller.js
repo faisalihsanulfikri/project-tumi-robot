@@ -80,107 +80,51 @@ module.exports.run = async function(req, res) {
   let dana_per_stock = await settings.dana_per_stock;
 
   let wAmount = "1000";
-  // Withdraw acion
-  let dataGetWistdraw = await getWithdrawRhb(
-    page,
-    URL_accountinfo,
-    robot_id,
-    wAmount
-  );
-
-  // await setWithdrawRhb(page, URL_accountinfo, robot_id, wAmount);
-
-  await setOffRobotStatus(robot_id, "finish");
-
-  let dataWithdraw = await setObjectDataWithdraw(dataGetWistdraw, user_id);
-
-  let uWithdraw, err;
-
-  console.log("dataWithdraw", dataWithdraw);
-
-  return res.json({
-    dataWithdraw
-  });
-
-  // dataGetWistdraw.forEach(async el => {
-  //   let getRequestTime = await moment(el.request_time, "DD MMM YYYY");
-  //   let formatRequestTime = moment(await getRequestTime).format(
-  //     "YYYY-MM-DD HH:mm:ss"
-  //   );
-
-  //   let data = {
-  //     request_time: await formatRequestTime,
-  //     reference_no: el.reference_no,
-  //     amount: el.amount,
-  //     processed_at: el.processed_at,
-  //     status: el.status,
-  //     reason: el.reason,
-  //     user_id: user_id,
-  //     updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-  //   };
-
-  //   [err, uWithdraw] = await to(
-  //     User_Withdraw.findOne({
-  //       where: { reference_no: await data.reference_no }
-  //     })
-  //   );
-  //   if (!uWithdraw) {
-  //     console.log(await data);
-
-  //     [err, uWithdraw] = await to(User_Withdraw.create(await data));
-  //   } else {
-  //     uWithdraw.set(await data);
-  //     [err, uWithdraw] = await to(uWithdraw.save());
-  //   }
-  // });
-
-  console.log(await data);
-
-  return res.json({
-    dataGetWistdraw: await data
-  });
-  return;
 
   /** START */
 
   // validate buy time
-  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-    let now = moment().format("HH:mm:ss");
-    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-    let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+  //   let now = moment().format("HH:mm:ss");
+  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-    console.log("now", now);
-    console.log("buy_time", buy_time);
+  //   console.log("now", now);
+  //   console.log("buy_time", buy_time);
 
-    if (now >= buy_time) {
-      isMoreThanBuyTime.stop();
-      // await setOffRobotStatus(robot_id, "Robot has done.");
-      // await browser.close();
-      await main(
-        res,
-        page,
-        browser,
-        user_id,
-        settings,
-        price_type,
-        level_per_stock,
-        stock_value_data,
-        dana_per_stock,
-        robot_id,
-        URL_protofolio,
-        thisUser
-      );
+  //   if (now >= buy_time) {
+  //     isMoreThanBuyTime.stop();
+  //     // await setOffRobotStatus(robot_id, "Robot has done.");
+  //     // await browser.close();
+  //     await main(
+  //       res,
+  //       page,
+  //       browser,
+  //       user_id,
+  //       settings,
+  //       price_type,
+  //       level_per_stock,
+  //       stock_value_data,
+  //       dana_per_stock,
+  //       robot_id,
+  //       URL_protofolio,
+  //       thisUser,
+  //       URL_accountinfo
+  //     );
 
-      await setOffRobotStatus(robot_id, "finish");
-      console.log("FINISH !!!");
-      console.log("now", now);
-      console.log("buy_time", buy_time);
-    }
-  });
+  //     await setOffRobotStatus(robot_id, "finish");
+  //     console.log("FINISH !!!");
+  //     console.log("now", now);
+  //     console.log("buy_time", buy_time);
+  //   }
+  // });
 
-  isMoreThanBuyTime.start();
+  // isMoreThanBuyTime.start();
 
   /** END */
+
+  await setOffRobotStatus(robot_id, "finish");
+  await browser.close();
 
   return res.json({
     success: 1,
@@ -201,20 +145,21 @@ async function main(
   dana_per_stock,
   robot_id,
   URL_protofolio,
-  thisUser
+  thisUser,
+  URL_accountinfo
 ) {
   let mainExec = [];
 
   // AUTOMATION INITIATION BUY
-  mainExec[0] = await automationInitBuys(
-    page,
-    price_type,
-    level_per_stock,
-    stock_value_data,
-    dana_per_stock
-  );
+  // mainExec[0] = await automationInitBuys(
+  //   page,
+  //   price_type,
+  //   level_per_stock,
+  //   stock_value_data,
+  //   dana_per_stock
+  // );
 
-  mainExec[1] = await page.waitFor(5000);
+  // mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
   mainExec[2] = await automation(
     res,
@@ -224,7 +169,8 @@ async function main(
     settings,
     robot_id,
     URL_protofolio,
-    thisUser
+    thisUser,
+    URL_accountinfo
   );
 
   Promise.all(mainExec).then(() => {
@@ -242,6 +188,7 @@ async function automationSells(page, matchStockBuys, user_id) {
       user_id: user_id,
       stock: el.stock,
       mode: el.mode,
+      lots: el.lots,
       status: el.status,
       priceBuy: el.price,
       priceSell: (parseInt(el.price) + 1).toString(),
@@ -260,12 +207,11 @@ async function automationSells(page, matchStockBuys, user_id) {
   dataDB[4] = await page.waitFor(2000);
 
   Promise.all(dataDB).then(() => {
-    console.log("setStockSell getStockSell finish!!!");
+    console.log("setStockSell getStockSell finish!!!", dataDB[2]);
   });
 
   let getDataStockSell = await dataDB[2];
   let stocksSell = [];
-
   for (let i = 0; i < (await getDataStockSell.length); i++) {
     stocksSell.push(await stockSell(page, await getDataStockSell[i]));
     await updateStockTransaction(await getDataStockSell[i]);
@@ -285,6 +231,7 @@ async function automationSellByTimes(page, openStockSells, user_id) {
       user_id: user_id,
       stock: el.stock,
       mode: el.mode,
+      lots: el.lots,
       status: el.status,
       priceBuy: el.price,
       priceSell: (parseInt(el.price) + 1).toString(),
@@ -345,6 +292,7 @@ async function automationBuys(page, matchStockSells, user_id) {
       user_id: user_id,
       stock: el.stock,
       mode: el.mode,
+      lots: el.lots,
       status: el.status,
       priceBuy: el.price,
       priceSell: (parseInt(el.price) + 1).toString(),
@@ -418,10 +366,13 @@ async function automation(
   settings,
   robot_id,
   URL_protofolio,
-  thisUser
+  thisUser,
+  URL_accountinfo
 ) {
   const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
+    await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
+    await page.waitFor(3000);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTtime = moment(settings.cl_time, "HH:mm:ss");
@@ -567,7 +518,7 @@ async function stockSell(page, dataStockSell) {
   await page.keyboard.press(String.fromCharCode(13));
   await page.waitFor(3000);
 
-  await page.type("input[id='_volume']", "1");
+  await page.type("input[id='_volume']", lots);
   await page.type("input[id='_price']", priceSell);
   await page.click("button[id='_enter']");
   await page.waitFor(1000);
@@ -586,6 +537,7 @@ async function stockSellByTime(page, dataStockSell) {
   const URL_orderpad_sell =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
   let stock = dataStockSell.stock;
+  let lots = dataStockSell.lots;
 
   console.log("stock ", stock);
 
@@ -600,7 +552,7 @@ async function stockSellByTime(page, dataStockSell) {
   console.log("type ", bidPrice);
 
   if (bidPrice != "&nbsp;") {
-    await page.type("input[id='_volume']", "1");
+    await page.type("input[id='_volume']", lots);
     await page.type("input[id='_price']", bidPrice);
     await page.click("button[id='_enter']");
     await page.waitFor(1000);
@@ -634,7 +586,7 @@ async function stockBuy(page, dataStockBuy) {
   await page.keyboard.press(String.fromCharCode(13));
   await page.waitFor(4000);
 
-  await page.type("input[id='_volume']", "1");
+  await page.type("input[id='_volume']", lots);
   await page.type("input[id='_price']", priceBuy);
   await page.click("button[id='_enter']");
   await page.waitFor(1000);
@@ -1164,7 +1116,7 @@ async function setOffRobotStatus(robot_id, message) {
 }
 
 // get withdraw data
-async function getWithdrawRhb(page, URL_accountinfo, robot_id, wAmount) {
+async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
   await page.goto(URL_accountinfo);
   await page.waitFor(1000);
 
@@ -1221,7 +1173,7 @@ async function setWithdrawRhb(page, URL_accountinfo, robot_id, wAmount) {
 async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
   let dataWithdraw = [];
 
-  dataGetWistdraw.forEach(el => {
+  dataGetWistdraw.forEach((el, i) => {
     let getRequestTime = moment(el.request_time, "DD MMM YYYY");
     let formatRequestTime = moment(getRequestTime).format(
       "YYYY-MM-DD HH:mm:ss"
@@ -1234,7 +1186,7 @@ async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
 
     let amount = el.amount.replace(/,\s*/g, "");
 
-    dataWithdraw = {
+    dataWithdraw[i] = {
       request_time: formatRequestTime,
       reference_no: el.reference_no,
       amount: amount,
@@ -1247,4 +1199,31 @@ async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
   });
 
   return dataWithdraw;
+}
+
+// set withdraw data
+async function setWithdrawData(page, URL_accountinfo, robot_id, user_id) {
+  let dataGetWistdraw = await getWithdrawRhb(page, URL_accountinfo, robot_id);
+
+  await page.waitFor(3000);
+
+  let dataWithdraw = await setObjectDataWithdraw(dataGetWistdraw, user_id);
+
+  await page.waitFor(3000);
+  let uWithdraw, err;
+
+  dataWithdraw.forEach(async el => {
+    [err, uWithdraw] = await to(
+      User_Withdraw.findOne({
+        where: { reference_no: el.reference_no }
+      })
+    );
+    if (!uWithdraw) {
+      console.log(el);
+      [err, uWithdraw] = await to(User_Withdraw.create(el));
+    } else {
+      uWithdraw.set(el);
+      [err, uWithdraw] = await to(uWithdraw.save());
+    }
+  });
 }

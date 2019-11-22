@@ -14,7 +14,13 @@ const sequelize = new Sequelize(
     host: APP_CONFIG.db_host,
     dialect: APP_CONFIG.db_dialect,
     port: APP_CONFIG.db_port,
-    operatorsAliases: false
+    operatorsAliases: false,
+    dialectOptions: {
+      useUTC: false,
+      dateStrings: true,
+      typeCast: true
+    },
+    timezone: "+07:00"
   }
 );
 
@@ -36,6 +42,5 @@ Object.keys(db).forEach(modelName => {
 });
 
 db.sequelize = sequelize;
-db.Sequelize = Sequelize;
 
 module.exports = db;
