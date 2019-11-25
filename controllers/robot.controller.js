@@ -85,9 +85,9 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
-  // await automationSetWithdrawRhb(page, URL_accountinfo, robot_id, user_id);
+  await automationSetWithdrawRhb(page, URL_accountinfo, robot_id, user_id);
 
-  // return;
+  return;
 
   /** END TEST */
 
@@ -454,30 +454,31 @@ async function automationSetWithdrawRhb(
   user_id
 ) {
   let dataDB = [];
+
   dataDB[0] = getWithdrawData(user_id);
+  dataDB[1] = console.log("dataDB", await dataDB[0]);
+  dataDB[2] = await page.waitFor(2000);
 
   Promise.all(dataDB).then(() => {
     console.log("getWithdrawData finish!!!");
   });
 
-  let requrstWithdraw = dataDB[0];
+  let requrstWithdraw = await dataDB[0];
 
-  console.log("requrstWithdraw", await requrstWithdraw);
+  console.log("requrstWithdraw", await requrstWithdraw.length);
 
-  // if (requrstWithdraw.length > 0) {
-  //   let execWithdraw = [];
-  //   for (let i = 0; i < (await requrstWithdraw.length); i++) {
-  //     execWithdraw.push(
-  //       await setWithdrawRhb(page, URL_accountinfo, await requrstWithdraw[i])
-  //     );
-  //     await updateWithdrawData(await requrstWithdraw[i]);
-  //   }
+  let execWithdraw = [];
+  for (let i = 0; i < (await requrstWithdraw.length); i++) {
+    execWithdraw.push(
+      await setWithdrawRhb(page, URL_accountinfo, await requrstWithdraw[i])
+    );
+    await updateWithdrawData(await requrstWithdraw[i]);
+  }
 
-  //   // run sell stock
-  //   Promise.all(execWithdraw).then(() => {
-  //     console.log("execWithdraw finish!!!");
-  //   });
-  // }
+  // run sell stock
+  Promise.all(execWithdraw).then(() => {
+    console.log("execWithdraw finish!!!");
+  });
 }
 
 // sell by time trigger
@@ -1292,5 +1293,16 @@ async function getWithdrawData(user_id) {
 
 // update withdraw data
 async function updateWithdrawData(requrstWithdraw) {
-  // todo
+  let err, withdraw;
+  let w_id = requrstWithdraw.id;
+
+  let updateData = {
+    on_submit: "yes",
+    updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+  };
+
+  [err, withdraw] = await to(Withdraw.findOne({ where: { id: w_id } }));
+
+  withdraw.set(updateData);
+  [err, withdraw] = await to(withdraw.save());
 }
