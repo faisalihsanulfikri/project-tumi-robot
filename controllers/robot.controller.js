@@ -85,10 +85,6 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
-  await automationSetWithdrawRhb(page, URL_accountinfo, robot_id, user_id);
-
-  return;
-
   /** END TEST */
 
   /** START */
@@ -103,30 +99,25 @@ module.exports.run = async function(req, res) {
   //   console.log("buy_time", buy_time);
 
   //   if (now >= buy_time) {
-  //     isMoreThanBuyTime.stop();
-  //     // await setOffRobotStatus(robot_id, "Robot has done.");
-  //     // await browser.close();
-  //     // await main(
-  //     //   res,
-  //     //   page,
-  //     //   browser,
-  //     //   user_id,
-  //     //   settings,
-  //     //   price_type,
-  //     //   level_per_stock,
-  //     //   stock_value_data,
-  //     //   dana_per_stock,
-  //     //   robot_id,
-  //     //   URL_protofolio,
-  //     //   thisUser,
-  //     //   URL_accountinfo,
-  //     //   spreadPerLevel
-  //     // );
-
   //     await setOffRobotStatus(robot_id, "finish");
-  //     console.log("FINISH !!!");
-  //     console.log("now", now);
-  //     console.log("buy_time", buy_time);
+
+  //     isMoreThanBuyTime.stop();
+  //     await main(
+  //       res,
+  //       page,
+  //       browser,
+  //       user_id,
+  //       settings,
+  //       price_type,
+  //       level_per_stock,
+  //       stock_value_data,
+  //       dana_per_stock,
+  //       robot_id,
+  //       URL_protofolio,
+  //       thisUser,
+  //       URL_accountinfo,
+  //       spreadPerLevel
+  //     );
   //   }
   // });
 
@@ -207,9 +198,8 @@ async function automation(
 ) {
   const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
-    // await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
-    // await automationSetWithdrawRhb(page, URL_accountinfo, robot_id, user_id);
-    await page.waitFor(3000);
+    await withdraws(page, URL_accountinfo, robot_id, user_id);
+    await page.waitFor(5000);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTtime = moment(settings.cl_time, "HH:mm:ss");
@@ -1166,12 +1156,32 @@ async function setOffRobotStatus(robot_id, message) {
   [err, robot] = await to(robot.save());
 }
 
+// exec withdraw
+async function withdraws(page, URL_accountinfo, robot_id, user_id) {
+  let exec = [];
+
+  exec[0] = await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
+  exec[1] = await page.waitFor(3000);
+  exec[2] = await automationSetWithdrawRhb(
+    page,
+    URL_accountinfo,
+    robot_id,
+    user_id
+  );
+
+  // run withdraw stock
+  Promise.all(exec).then(() => {
+    console.log("withdraw Execute");
+  });
+}
+
 // get withdraw data
 async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
+  let now = moment().format("MM/01/YYYY");
   await page.goto(URL_accountinfo);
   await page.waitFor(1000);
 
-  await page.type("input[id='date-from']", "11/01/2019");
+  await page.type("input[id='date-from']", now);
   await page.waitFor(1000);
   await page.click("button[onclick='loadWithdrawList();']");
   await page.waitFor(1000);
