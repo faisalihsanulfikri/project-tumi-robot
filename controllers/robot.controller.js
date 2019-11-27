@@ -1,4 +1,7 @@
+const { Init_Buy } = require("../models");
 const { Master_Setting } = require("../models");
+const { Portofolios } = require("../models");
+const { Portofolio_stocks } = require("../models");
 const { Robot } = require("../models");
 const { Security } = require("../models");
 const { Stock_Sell } = require("../models");
@@ -85,6 +88,14 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
+  // await sellByTimeOffTrigger(
+  //   page,
+  //   URL_protofolio,
+  //   user_id,
+  //   clValue,
+  //   profitPerLevel
+  // );
+
   /** END TEST */
 
   /** START */
@@ -126,7 +137,7 @@ module.exports.run = async function(req, res) {
   /** END */
 
   await setOffRobotStatus(robot_id, "finish");
-  await browser.close();
+  // await browser.close();
 
   return res.json({
     success: 1,
@@ -153,15 +164,27 @@ async function main(
 ) {
   let mainExec = [];
 
-  // AUTOMATION INITIATION BUY
-  mainExec[0] = await automationInitBuys(
-    page,
-    price_type,
-    level_per_stock,
-    stock_value_data,
-    dana_per_stock,
-    spreadPerLevel
-  );
+  if (settings.is_sell_by_time == "true") {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+    mainExec[0] = await automationInitBuys(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel
+    );
+  } else {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+    mainExec[0] = await automationInitBuysSellTimeFalse(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel
+    );
+  }
 
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
@@ -234,7 +257,7 @@ async function automation(
         let message = "Robot has done.";
         let exec = [];
 
-        exec[0] = await sellByTimeTrigger(page, user_id);
+        exec[0] = await sellByTimeOnTrigger(page, user_id);
         exec[1] = await page.waitFor(1500);
         exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
         exec[3] = await page.waitFor(1500);
@@ -257,8 +280,40 @@ async function automation(
   job.start();
 }
 
-// automation initiation buys
+// automation initiation buys (is_sell_by_time == true)
 async function automationInitBuys(
+  page,
+  price_type,
+  level_per_stock,
+  stock_value_data,
+  dana_per_stock,
+  spreadPerLevel
+) {
+  let stocksInitBuy = [];
+  for (let i = 0; i < stock_value_data.length; i++) {
+    for (let idx = 0; idx < level_per_stock; idx++) {
+      stocksInitBuy.push(
+        await stockInitBuy(
+          page,
+          price_type,
+          level_per_stock,
+          stock_value_data[i],
+          dana_per_stock,
+          idx,
+          spreadPerLevel
+        )
+      );
+    }
+  }
+
+  // run initiation buy stock
+  Promise.all(stocksInitBuy).then(() => {
+    console.log("finish initiation buy!!!");
+  });
+}
+
+// automation initiation buys  (is_sell_by_time == false)
+async function automationInitBuysSellTimeFalse(
   page,
   price_type,
   level_per_stock,
@@ -417,7 +472,7 @@ async function automationSellByTimes(page, openStockSells, user_id) {
   });
 }
 
-// automation withdraw stock sell
+// automation withdraw stock sell (sell by time on)
 async function automationWithdrawStockSell(page, withdrawData) {
   let data = await withdrawData;
   let withdrawStockSell = [];
@@ -428,6 +483,23 @@ async function automationWithdrawStockSell(page, withdrawData) {
         await setWithdrawStockSell(page, await data[i], i)
       );
     }
+  }
+
+  // run withdraw stock
+  Promise.all(withdrawStockSell).then(() => {
+    console.log("withdrawStockSell finish!!!");
+  });
+}
+
+// automation withdraw stock sell (sell by time off)
+async function automationWithdrawStockSellOff(page, withdrawData) {
+  let data = await withdrawData;
+  let withdrawStockSell = [];
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    withdrawStockSell.push(
+      await setWithdrawStockSell(page, await data[i], data[i].index)
+    );
   }
 
   // run withdraw stock
@@ -471,8 +543,8 @@ async function automationSetWithdrawRhb(
   });
 }
 
-// sell by time trigger
-async function sellByTimeTrigger(page, user_id) {
+// sell by time on trigger
+async function sellByTimeOnTrigger(page, user_id) {
   let transaction = await getTransaction(page);
   await page.waitFor(1000);
 
@@ -1047,7 +1119,8 @@ async function setSettings(user_id, settings) {
     stock_value: settings.stock_value,
     cl_value: settings.cl_value,
     cl_time: settings.cl_time,
-    price_type: settings.price_type
+    price_type: settings.price_type,
+    init_buy: "0"
   };
 
   let updateData = {};
@@ -1315,4 +1388,207 @@ async function updateWithdrawData(requrstWithdraw) {
 
   withdraw.set(updateData);
   [err, withdraw] = await to(withdraw.save());
+}
+
+// get portofolio rhb
+async function getPortofolioRhb(page, URL_protofolio) {
+  await page.goto(URL_protofolio);
+  await page.waitFor(2000);
+
+  const headData = {};
+
+  let startingBalance = await page.evaluate(
+    () => document.querySelector("div[id='_startingBalance']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let availableLimit = await page.evaluate(
+    () => document.querySelector("div[id='_availableLimit']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let fundingAvailable = await page.evaluate(
+    () => document.querySelector("div[id='_fundingAvailable']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let totalAsset = await page.evaluate(
+    () => document.querySelector("div[id='_totalAsset']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let cashRdn = await page.evaluate(
+    () => document.querySelector("div[id='_cashRdn']").innerHTML
+  );
+  await page.waitFor(1000);
+  const item = [];
+
+  (headData["starting_balance"] = await startingBalance.replace(/,\s*/g, "")),
+    (headData["available_limit"] = await availableLimit.replace(/,\s*/g, "")),
+    (headData["funding_available"] = await fundingAvailable.replace(
+      /,\s*/g,
+      ""
+    )),
+    (headData["total_asset"] = await totalAsset.replace(/,\s*/g, "")),
+    (headData["cash_in_rdn"] = await cashRdn.replace(/,\s*/g, "")),
+    item.push(headData);
+
+  await page.waitFor(1000);
+  const table = await page.evaluate(() => {
+    return new Promise((resolve, reject) => {
+      let table = document.querySelector("#_portfolio");
+      let row = table.children;
+      let items = [];
+      let length = [];
+      length = row.length - 1;
+
+      for (let i = 0; i < length; i++) {
+        let result = {};
+        const tr = row[i];
+        const text = tr.children;
+        if (!text[i].textContent) {
+        } else {
+          result["stock"] = text[0].textContent;
+          (result["avg_buy"] = text[1].textContent.replace(/,\s*/g, "")),
+            (result["last"] = text[2].textContent);
+          (result["gross_value"] = text[6].textContent.replace(/,\s*/g, "")),
+            (result["market_value"] = text[7].textContent.replace(/,\s*/g, "")),
+            (result["pl_price"] = text[10].textContent.replace(/,\s*/g, "")),
+            (result["pl_percent"] = text[11].textContent.replace(/,\s*/g, "")),
+            items.push(result);
+        }
+      }
+      resolve(items);
+    });
+  });
+
+  return { item, table };
+}
+
+// set protofolio data
+async function setProtofolioData(page, getPortofolio, user_id) {
+  getPortofolio.item.forEach(async el => {
+    [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
+    // if (err) return res.json(err, 422);
+
+    el.user_id = user_id;
+    console.log(portofolios);
+    if (!portofolios) {
+      [err, portofolios] = await to(Portofolios.create(el));
+      lastinsertId = portofolios.dataValues.id;
+      // if (err) return ReE(res, err, 422);
+    } else {
+      lastinsertId = portofolios.id;
+      portofolios.set(el);
+      [err, portofolios] = await to(portofolios.save());
+      // if (err) return ReE(res, err, 422);
+
+      //   }
+    }
+  });
+
+  // [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
+
+  await page.waitFor(2000);
+
+  getPortofolio.table.forEach(async el => {
+    [err, portofolio_stock] = await to(
+      Portofolio_stocks.findOne({ where: { user_id: user_id } })
+    );
+    // if (portofolio_stock) return ReE(res, err, 422);
+
+    // console.log(stock.dataValues.id)
+    el.portofolio_id = lastinsertId;
+    el.user_id = user_id;
+    // console.log(portofolio_stock)
+    if (!portofolio_stock) {
+      [err, portofolio_stock] = await to(Portofolio_stocks.create(el));
+      // if (portofolio_stock) return ReE(res, err, 422);
+    } else {
+      portofolio_stock.set(el);
+      [err, portofolio_stock] = await to(portofolio_stock.save());
+      // if (err) return ReE(res, err, 422);
+    }
+  });
+}
+
+// automation protofolio
+async function automationPortofolio(page, URL_protofolio, user_id) {
+  let exec = [];
+
+  exec[0] = await getPortofolioRhb(page, URL_protofolio);
+  exec[1] = await page.waitFor(1000);
+  exec[2] = await console.log("portofolio", await exec[0]);
+  exec[3] = await page.waitFor(1000);
+  exec[4] = await setProtofolioData(page, exec[0], user_id);
+
+  Promise.all(exec).then(() => {
+    console.log("getPortofolioRhb setProtofolioData finish!!!");
+  });
+
+  return await exec[0];
+}
+
+// get data if last more than tp or last less than cl
+async function getTpClStock(matchStockSells) {
+  return matchStockSells.filter(el => el.tp >= el.last || el.cl <= el.last);
+}
+
+// sell by time off trigger
+async function sellByTimeOffTrigger(
+  page,
+  URL_protofolio,
+  user_id,
+  clValue,
+  profitPerLevel
+) {
+  let data = await automationPortofolio(page, URL_protofolio, user_id);
+  await page.waitFor(1000);
+
+  let filterStockProtofolio = await data.table.map(el => ({
+    stock: el.stock,
+    last: el.last
+  }));
+
+  // TRANSACTION
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
+
+  // get open stock
+  let stockOpen = transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (stockOpen.length > 0) {
+    let mapStockOpen = stockOpen.map((el, i) => ({
+      ...el,
+      index: i
+    }));
+
+    mapStockOpen.forEach((el, i) => {
+      let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
+      let price = parseInt(el.price);
+
+      el.last = parseInt(dataLast[0].last);
+      el.cl = Math.round(price - (price * clValue) / 100);
+      el.tp = Math.round(price + (price * profitPerLevel) / 100);
+    });
+
+    // get tp or cl
+    let tpclStock = await getTpClStock(mapStockOpen);
+
+    if (tpclStock.length > 0) {
+      let tpclStockSell = await tpclStock.filter(el => {
+        return el.mode == "Sell";
+      });
+
+      if (tpclStockSell.length > 0) {
+        await automationWithdrawStockSellOff(page, tpclStockSell);
+
+        await page.waitFor(2000);
+
+        await automationSellByTimes(page, tpclStockSell, user_id);
+      }
+    }
+  }
 }
