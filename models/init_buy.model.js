@@ -6,7 +6,9 @@ module.exports = (sequelize, DataTypes) => {
       user_id: DataTypes.INTEGER,
       order_date: DataTypes.DATE,
       stock: DataTypes.STRING,
-      price: DataTypes.INTEGER
+      price: DataTypes.INTEGER,
+      mode: DataTypes.STRING,
+      lots: DataTypes.INTEGER
     },
     {
       reezeTableName: true,

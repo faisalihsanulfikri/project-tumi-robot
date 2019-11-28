@@ -5,6 +5,7 @@ const { Portofolio_stocks } = require("../models");
 const { Robot } = require("../models");
 const { Security } = require("../models");
 const { Stock_Sell } = require("../models");
+const { Transaction } = require("../models");
 const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { User_Withdraw } = require("../models");
@@ -88,60 +89,45 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
-  let lastPrice = await getLastPrice(user_id, "TRAM");
-
-  return res.json({
-    lastPrice: lastPrice[0] - 1
-  });
-
-  // await sellByTimeOffTrigger(
-  //   page,
-  //   URL_protofolio,
-  //   user_id,
-  //   clValue,
-  //   profitPerLevel
-  // );
-
-  // let err, initBuy;
-  // [err, initBuy] = await to(Init_Buy.findAll({ where: { user_id: user_id } }));
-
   /** END TEST */
 
   /** START */
 
   // validate buy time
-  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-  //   let now = moment().format("HH:mm:ss");
-  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+    let now = moment().format("HH:mm:ss");
+    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+    let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-  //   console.log("now", now);
-  //   console.log("buy_time", buy_time);
+    console.log("now", now);
+    console.log("buy_time", buy_time);
 
-  //   if (now >= buy_time) {
-  //     await setOffRobotStatus(robot_id, "finish");
+    if (now >= buy_time) {
+      await setOffRobotStatus(robot_id, "finish");
 
-  //     isMoreThanBuyTime.stop();
-  //     await main(
-  //       res,
-  //       page,
-  //       browser,
-  //       user_id,
-  //       settings,
-  //       price_type,
-  //       level_per_stock,
-  //       stock_value_data,
-  //       dana_per_stock,
-  //       robot_id,
-  //       URL_protofolio,
-  //       thisUser,
-  //       URL_accountinfo,
-  //       spreadPerLevel
-  //     );
-  //   }
-  // });
+      isMoreThanBuyTime.stop();
+      await main(
+        res,
+        page,
+        browser,
+        user_id,
+        settings,
+        price_type,
+        level_per_stock,
+        stock_value_data,
+        dana_per_stock,
+        robot_id,
+        URL_protofolio,
+        thisUser,
+        URL_accountinfo,
+        spreadPerLevel,
+        clValue,
+        profitPerLevel
+      );
+    }
+  });
 
-  // isMoreThanBuyTime.start();
+  isMoreThanBuyTime.start();
 
   /** END */
 
@@ -169,7 +155,9 @@ async function main(
   URL_protofolio,
   thisUser,
   URL_accountinfo,
-  spreadPerLevel
+  spreadPerLevel,
+  clValue,
+  profitPerLevel
 ) {
   let mainExec = [];
 
@@ -196,19 +184,21 @@ async function main(
     );
   }
 
-  // mainExec[1] = await page.waitFor(5000);
-  // // AUTOMATION
-  // mainExec[2] = await automation(
-  //   res,
-  //   page,
-  //   browser,
-  //   user_id,
-  //   settings,
-  //   robot_id,
-  //   URL_protofolio,
-  //   thisUser,
-  //   URL_accountinfo
-  // );
+  mainExec[1] = await page.waitFor(5000);
+  // AUTOMATION
+  mainExec[2] = await automation(
+    res,
+    page,
+    browser,
+    user_id,
+    settings,
+    robot_id,
+    URL_protofolio,
+    thisUser,
+    URL_accountinfo,
+    clValue,
+    profitPerLevel
+  );
 
   Promise.all(mainExec).then(() => {
     console.log("automationInitBuys automation finish!!!");
@@ -227,7 +217,9 @@ async function automation(
   robot_id,
   URL_protofolio,
   thisUser,
-  URL_accountinfo
+  URL_accountinfo,
+  clValue,
+  profitPerLevel
 ) {
   const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
@@ -281,6 +273,14 @@ async function automation(
           );
         });
       }
+    } else {
+      await sellByTimeOffTrigger(
+        page,
+        URL_protofolio,
+        user_id,
+        clValue,
+        profitPerLevel
+      );
     }
 
     console.log("globalIndex = ", globalIndex);
@@ -332,27 +332,45 @@ async function automationInitBuysSellTimeFalse(
   spreadPerLevel,
   user_id
 ) {
+  let lastInit = await getLastInitBuysSells(user_id);
   let stocksInitBuy = [];
-  for (let i = 0; i < stock_value_data.length; i++) {
-    for (let idx = 0; idx < level_per_stock; idx++) {
-      stocksInitBuy.push(
-        await stockInitBuySellTimeOff(
-          page,
-          price_type,
-          level_per_stock,
-          stock_value_data[i],
-          dana_per_stock,
-          idx,
-          spreadPerLevel,
-          user_id
-        )
-      );
+  let stocksInitSell = [];
+
+  // init stock
+  if (lastInit.length > 0) {
+    for (let i = 0; i < lastInit.length; i++) {
+      if (lastInit[i].mode == "Buy") {
+        stocksInitBuy.push(await stockInitBuySellTimeOff(page, lastInit[i]));
+      } else {
+        stocksInitSell.push(await stockInitSellSellTimeOff(page, lastInit[i]));
+      }
+    }
+  } else {
+    for (let i = 0; i < stock_value_data.length; i++) {
+      for (let idx = 0; idx < level_per_stock; idx++) {
+        stocksInitBuy.push(
+          await stockInitBuy(
+            page,
+            price_type,
+            level_per_stock,
+            stock_value_data[i],
+            dana_per_stock,
+            idx,
+            spreadPerLevel
+          )
+        );
+      }
     }
   }
 
   // run initiation buy stock
   Promise.all(stocksInitBuy).then(() => {
-    console.log("finish initiation buy!!!");
+    console.log("finish initiation buy (sell by time off) !!!");
+  });
+
+  // run initiation buy stock
+  Promise.all(stocksInitSell).then(() => {
+    console.log("finish initiation sell (sell by time off) !!!");
   });
 }
 
@@ -588,6 +606,65 @@ async function sellByTimeOnTrigger(page, user_id) {
   }
 }
 
+// sell by time off trigger
+async function sellByTimeOffTrigger(
+  page,
+  URL_protofolio,
+  user_id,
+  clValue,
+  profitPerLevel
+) {
+  let data = await automationPortofolio(page, URL_protofolio, user_id);
+  await page.waitFor(1000);
+
+  let filterStockProtofolio = await data.table.map(el => ({
+    stock: el.stock,
+    last: el.last
+  }));
+
+  // TRANSACTION
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
+
+  // get open stock
+  let stockOpen = transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (stockOpen.length > 0) {
+    let mapStockOpen = stockOpen.map((el, i) => ({
+      ...el,
+      index: i
+    }));
+
+    mapStockOpen.forEach((el, i) => {
+      let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
+      let price = parseInt(el.price);
+
+      el.last = parseInt(dataLast[0].last);
+      el.cl = Math.round(price - (price * clValue) / 100);
+      el.tp = Math.round(price + (price * profitPerLevel) / 100);
+    });
+
+    // get tp or cl
+    let tpclStock = await getTpClStock(mapStockOpen);
+
+    if (tpclStock.length > 0) {
+      let tpclStockSell = await tpclStock.filter(el => {
+        return el.mode == "Sell";
+      });
+
+      if (tpclStockSell.length > 0) {
+        await automationWithdrawStockSellOff(page, tpclStockSell);
+
+        await page.waitFor(2000);
+
+        await automationSellByTimes(page, tpclStockSell, user_id);
+      }
+    }
+  }
+}
+
 // set init buy stocks (sell by time == true)
 async function stockInitBuy(
   page,
@@ -633,60 +710,59 @@ async function stockInitBuy(
 }
 
 // set init buy stocks (sell by time == false)
-async function stockInitBuySellTimeOff(
-  page,
-  price_type,
-  level,
-  stock,
-  dana_per_stock,
-  i,
-  spreadPerLevel,
-  user_id
-) {
+async function stockInitBuySellTimeOff(page, lastInit) {
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
-  let price;
-  console.log("stock ", stock);
+  let stock = lastInit.stock;
+  let price = lastInit.price.toString();
+  let lots = lastInit.lots.toString();
+
   await page.goto(URL_orderpad_buy);
   await page.type("input[id='_stockCode']", stock);
-  await page.keyboard.press(String.fromCharCode(13));
-  await page.waitFor(4000);
 
-  let stockBudget = dana_per_stock;
-  // let lastPrice = await getLastPrice(user_id, stock);
-
-  let price = await getBuyPriceSellTimeOff(
-    page,
-    price_type,
-    level,
-    spreadPerLevel,
-    lastPrice
-  );
-  let lot = await getLot(stockBudget, level, price[i]);
-
-  if (price[i] != "NaN") {
-    if (parseInt(price[i]) >= 50) {
-      await page.type("input[id='_price']", price[i]);
-      await page.type("input[id='_volume']", lot);
-      await page.click("button[id='_enter']");
-      await page.waitFor(1000);
-      await page.click("button[id='_confirm']");
-      await page.waitFor(1000);
-      console.log("=-=-=-=-=BUY=-=-=-=-=", parseInt(price[i]));
-
-      await setInitBuySellTimeOff(user_id, stock, price[i]);
-
-      let err, initBuy;
-      [err, initBuy] = [err, security] = await to(
-        Security.create(security_info)
-      );
-    }
+  if (parseInt(price) >= 50) {
+    await page.type("input[id='_price']", price);
+    await page.type("input[id='_volume']", lots);
+    await page.click("button[id='_enter']");
+    await page.waitFor(1000);
+    await page.click("button[id='_confirm']");
+    await page.waitFor(1000);
+    console.log("=-=-=-=-=BUY INIT=-=-=-=-=", parseInt(price));
   }
 
-  console.log("price ", await price);
-  console.log("lot ", lot);
-  console.log("price[] ", await price[i]);
+  console.log("price ", price);
+  console.log("lot ", lots);
+  console.log("finish");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// set init sell stocks (sell by time == false)
+async function stockInitSellSellTimeOff(page, lastInit) {
+  const URL_orderpad_sell =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
+
+  let stock = lastInit.stock;
+  let price = lastInit.price.toString();
+  let lots = lastInit.lots.toString();
+
+  await page.goto(URL_orderpad_sell);
+  await page.type("input[id='_stockCode']", stock);
+
+  if (parseInt(price) >= 50) {
+    await page.type("input[id='_price']", price);
+    await page.type("input[id='_volume']", lots);
+    await page.click("button[id='_enter']");
+    await page.waitFor(1000);
+    await page.click("button[id='_confirm']");
+    await page.waitFor(1000);
+    console.log("=-=-=-=-=SELL INIT=-=-=-=-=", parseInt(price));
+  }
+
+  console.log("price ", price);
+  console.log("lot ", lots);
   console.log("finish");
   console.log("##############################################");
 
@@ -1042,54 +1118,6 @@ async function getBuyPrice(page, price_type, level, spreadPerLevel) {
   let price;
   let dataPrice = [];
   let spread = 0;
-  if (price_type == "open") {
-    price = await getOpenPrice(page);
-  } else if (price_type == "prev") {
-    price = await getPrevClosePrice(page);
-  } else {
-    price = await getClosePrice(page);
-  }
-
-  dataPrice[0] = parseInt(await price);
-  // spread price by level per stock
-
-  spread = await getSpread(await dataPrice[0], spreadPerLevel);
-
-  for (let i = 1; i < level; i++) {
-    dataPrice[i] = dataPrice[i - 1] - (await spread);
-  }
-
-  for (let i = 0; i < level; i++) {
-    dataPrice[i] = dataPrice[i].toString();
-  }
-
-  return dataPrice;
-}
-
-// get spesify buy price (sell by time == false)
-async function getBuyPriceSellTimeOff(
-  page,
-  price_type,
-  level,
-  spreadPerLevel,
-  lastPrice
-) {
-  let price;
-  let dataPrice = [];
-  let spread = 0;
-
-  // if (lastPrice.length > 0) {
-  //   price = lastPrice[0] - 1;
-  // } else {
-  //   if (price_type == "open") {
-  //     price = await getOpenPrice(page);
-  //   } else if (price_type == "prev") {
-  //     price = await getPrevClosePrice(page);
-  //   } else {
-  //     price = await getClosePrice(page);
-  //   }
-  // }
-
   if (price_type == "open") {
     price = await getOpenPrice(page);
   } else if (price_type == "prev") {
@@ -1655,91 +1683,73 @@ async function getTpClStock(matchStockSells) {
   return matchStockSells.filter(el => el.tp >= el.last || el.cl <= el.last);
 }
 
-// sell by time off trigger
-async function sellByTimeOffTrigger(
-  page,
-  URL_protofolio,
-  user_id,
-  clValue,
-  profitPerLevel
-) {
-  let data = await automationPortofolio(page, URL_protofolio, user_id);
-  await page.waitFor(1000);
-
-  let filterStockProtofolio = await data.table.map(el => ({
-    stock: el.stock,
-    last: el.last
-  }));
-
-  // TRANSACTION
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
-
-  // get open stock
-  let stockOpen = transaction.filter(el => {
-    return el.status == "Open";
-  });
-
-  if (stockOpen.length > 0) {
-    let mapStockOpen = stockOpen.map((el, i) => ({
-      ...el,
-      index: i
-    }));
-
-    mapStockOpen.forEach((el, i) => {
-      let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
-      let price = parseInt(el.price);
-
-      el.last = parseInt(dataLast[0].last);
-      el.cl = Math.round(price - (price * clValue) / 100);
-      el.tp = Math.round(price + (price * profitPerLevel) / 100);
-    });
-
-    // get tp or cl
-    let tpclStock = await getTpClStock(mapStockOpen);
-
-    if (tpclStock.length > 0) {
-      let tpclStockSell = await tpclStock.filter(el => {
-        return el.mode == "Sell";
-      });
-
-      if (tpclStockSell.length > 0) {
-        await automationWithdrawStockSellOff(page, tpclStockSell);
-
-        await page.waitFor(2000);
-
-        await automationSellByTimes(page, tpclStockSell, user_id);
-      }
-    }
-  }
-}
-
-async function getLastPrice(user_id, stock) {
-  let prices = [];
+// get last init sell
+async function getLastInitBuysSells(user_id) {
+  let lastInitBuy = [];
   let lastOrder = moment()
     .subtract(1, "days")
     .format("YYYY-MM-DD");
 
   let err, initBuy;
 
-  [err, initBuy] = await to(
-    Init_Buy.findAll({ where: { user_id: user_id, stock: stock } })
-  );
+  [err, initBuy] = await to(Init_Buy.findAll({ where: { user_id: user_id } }));
 
   if (initBuy.length > 0) {
-    let lastInitBuy = initBuy.filter(el => {
+    lastInitBuy = initBuy.filter(el => {
       let orderDate = moment(el.order_date).format("YYYY-MM-DD");
 
       return orderDate == lastOrder;
     });
+  }
 
-    lastInitBuy.forEach(el => {
-      prices.push(el.price);
-    });
+  return lastInitBuy;
+}
 
-    prices.sort(function(a, b) {
-      return a - b;
+// set transaction
+async function setTransactionData(page, user_id) {
+  let getTransaction = await getTransaction(page);
+
+  let err, transaction;
+
+  getTransaction.forEach(async el => {
+    [err, transaction] = await to(
+      Transaction.findOne({ where: { order_id: el.order_id } })
+    );
+    if (!transaction) {
+      console.log(el);
+      [err, transaction] = await to(Transaction.create(el));
+      if (err) return ReE(res, err, 422);
+    } else {
+      transaction.set(el);
+      [err, transaction] = await to(transaction.save());
+      if (err) return ReE(res, err, 422);
+    }
+  });
+}
+
+// set last init sell by time off
+async function setInitBuySell(page, user_id) {
+  let now = moment().format("YYYY-MM-DD HH:mm:ss");
+  let transaction = await getTransaction(page);
+
+  let filterInit = await transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (filterInit.length > 0) {
+    filterInit.forEach(async el => {
+      let orderDate = moment().format("YYYY-MM-DD");
+      let orderDateTime = orderDate + " " + el.order_time;
+      let data = {
+        user_id: user_id,
+        order_date: orderDateTime,
+        stock: el.stock,
+        price: el.price,
+        mode: el.mode,
+        updatedAt: now,
+        lots: el.lots
+      };
+      [err, initBuy] = await to(Init_Buy.create(data));
     });
   }
-  return prices;
 }
