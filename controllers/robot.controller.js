@@ -6,6 +6,7 @@ const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { User_Withdraw } = require("../models");
 const { Withdraw } = require("../models");
+const { Stock_rangking } = require("../models");
 const { to, ReE, ReS } = require("../services/util.service");
 
 const puppeteer = require("puppeteer");
@@ -699,6 +700,105 @@ async function getTransaction(page) {
   } catch (err) {
     return err;
   }
+}
+
+// get stock rangking
+async function stockRanking(page) {
+
+  await page.goto(
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/stock_ranking.jsp"
+  );
+
+  await page.click("button[onclick='loadData();']")
+
+  await page.waitFor(3000);
+
+  await page.click("th[aria-label='Chg%: activate to sort column ascending']")
+  await page.click("th[class='title-content sorting_asc']")
+  
+  await page.waitFor(1000);
+
+  
+  const first_data = await page.evaluate(() => {
+    let table = document.querySelector("#_tsorter")
+    let row = table.children
+    let page1 = []
+    for (let i = 0; i < row.length; i++) {
+      const el = row[i];
+      let item = el.children
+      
+      let result = {}
+
+      result['stock'] = item[0].textContent
+      result['prev'] = item[1].textContent
+      result['open'] = item[2].textContent
+      result['high'] = item[3].textContent
+      result['low'] = item[4].textContent
+      result['last'] = item[5].textContent
+      result['chg'] = item[6].textContent
+      result['chg_percent'] = item[7].textContent
+      result['freq'] = item[8].textContent
+      result['vol'] = item[9].textContent
+      result['val'] = item[10].textContent
+
+      page1.push(result)
+    }
+    return page1
+  })
+
+  await page.click("a[data-dt-idx='2']")
+
+  const second_data = await page.evaluate(() => {
+    let table = document.querySelector("#_tsorter")
+    let row = table.children
+    let page2 = []
+    for (let i = 0; i < row.length; i++) {
+      const el = row[i];
+      let item = el.children
+      
+      let result = {}
+
+      result['stock'] = item[0].textContent
+      result['prev'] = item[1].textContent
+      result['open'] = item[2].textContent
+      result['high'] = item[3].textContent
+      result['low'] = item[4].textContent
+      result['last'] = item[5].textContent
+      result['chg'] = item[6].textContent
+      result['chg_percent'] = item[7].textContent
+      result['freq'] = item[8].textContent
+      result['vol'] = item[9].textContent
+      result['val'] = item[10].textContent
+
+      page2.push(result)
+    }
+    return page2
+  })
+  let fulldata = first_data.concat(second_data)
+  // console.log(fulldata)
+  return fulldata
+  
+}
+
+// input stock rangking
+async function inputStockRangking(page) {
+  
+  let stock_rangking,getStockrangking,stock,err;
+
+  getStockrangking = await stockRanking(page);
+  
+  // const browser = await puppeteer.launch({
+  //     headless: true,
+  //     defaultViewport: null
+  //   });
+
+  //   const page = await browser.newPage();
+      await page.waitFor(1000);
+
+      getStockrangking.forEach(async el => {
+          [err, stock_rangking] = await to(Stock_rangking.create(el));
+        
+    });
 }
 
 // get Users
