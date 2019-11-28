@@ -88,6 +88,12 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
+  let lastPrice = await getLastPrice(user_id, "TRAM");
+
+  return res.json({
+    lastPrice: lastPrice[0] - 1
+  });
+
   // await sellByTimeOffTrigger(
   //   page,
   //   URL_protofolio,
@@ -95,6 +101,9 @@ module.exports.run = async function(req, res) {
   //   clValue,
   //   profitPerLevel
   // );
+
+  // let err, initBuy;
+  // [err, initBuy] = await to(Init_Buy.findAll({ where: { user_id: user_id } }));
 
   /** END TEST */
 
@@ -182,23 +191,24 @@ async function main(
       level_per_stock,
       stock_value_data,
       dana_per_stock,
-      spreadPerLevel
+      spreadPerLevel,
+      user_id
     );
   }
 
-  mainExec[1] = await page.waitFor(5000);
-  // AUTOMATION
-  mainExec[2] = await automation(
-    res,
-    page,
-    browser,
-    user_id,
-    settings,
-    robot_id,
-    URL_protofolio,
-    thisUser,
-    URL_accountinfo
-  );
+  // mainExec[1] = await page.waitFor(5000);
+  // // AUTOMATION
+  // mainExec[2] = await automation(
+  //   res,
+  //   page,
+  //   browser,
+  //   user_id,
+  //   settings,
+  //   robot_id,
+  //   URL_protofolio,
+  //   thisUser,
+  //   URL_accountinfo
+  // );
 
   Promise.all(mainExec).then(() => {
     console.log("automationInitBuys automation finish!!!");
@@ -319,20 +329,22 @@ async function automationInitBuysSellTimeFalse(
   level_per_stock,
   stock_value_data,
   dana_per_stock,
-  spreadPerLevel
+  spreadPerLevel,
+  user_id
 ) {
   let stocksInitBuy = [];
   for (let i = 0; i < stock_value_data.length; i++) {
     for (let idx = 0; idx < level_per_stock; idx++) {
       stocksInitBuy.push(
-        await stockInitBuy(
+        await stockInitBuySellTimeOff(
           page,
           price_type,
           level_per_stock,
           stock_value_data[i],
           dana_per_stock,
           idx,
-          spreadPerLevel
+          spreadPerLevel,
+          user_id
         )
       );
     }
@@ -576,7 +588,7 @@ async function sellByTimeOnTrigger(page, user_id) {
   }
 }
 
-// set init buy stocks
+// set init buy stocks (sell by time == true)
 async function stockInitBuy(
   page,
   price_type,
@@ -597,6 +609,60 @@ async function stockInitBuy(
 
   let stockBudget = dana_per_stock;
   let price = await getBuyPrice(page, price_type, level, spreadPerLevel);
+  let lot = await getLot(stockBudget, level, price[i]);
+
+  if (price[i] != "NaN") {
+    if (parseInt(price[i]) >= 50) {
+      await page.type("input[id='_price']", price[i]);
+      await page.type("input[id='_volume']", lot);
+      await page.click("button[id='_enter']");
+      await page.waitFor(1000);
+      await page.click("button[id='_confirm']");
+      await page.waitFor(1000);
+      console.log("=-=-=-=-=BUY=-=-=-=-=", parseInt(price[i]));
+    }
+  }
+
+  console.log("price ", await price);
+  console.log("lot ", lot);
+  console.log("price[] ", await price[i]);
+  console.log("finish");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// set init buy stocks (sell by time == false)
+async function stockInitBuySellTimeOff(
+  page,
+  price_type,
+  level,
+  stock,
+  dana_per_stock,
+  i,
+  spreadPerLevel,
+  user_id
+) {
+  const URL_orderpad_buy =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
+
+  let price;
+  console.log("stock ", stock);
+  await page.goto(URL_orderpad_buy);
+  await page.type("input[id='_stockCode']", stock);
+  await page.keyboard.press(String.fromCharCode(13));
+  await page.waitFor(4000);
+
+  let stockBudget = dana_per_stock;
+  let lastPrice = await getLastPrice(user_id, stock);
+
+  let price = await getBuyPriceSellTimeOff(
+    page,
+    price_type,
+    level,
+    spreadPerLevel,
+    lastPrice
+  );
   let lot = await getLot(stockBudget, level, price[i]);
 
   if (price[i] != "NaN") {
@@ -964,7 +1030,7 @@ async function getBidPrice(page) {
   );
 }
 
-// get spesify buy price
+// get spesify buy price (sell by time == true)
 async function getBuyPrice(page, price_type, level, spreadPerLevel) {
   let price;
   let dataPrice = [];
@@ -975,6 +1041,46 @@ async function getBuyPrice(page, price_type, level, spreadPerLevel) {
     price = await getPrevClosePrice(page);
   } else {
     price = await getClosePrice(page);
+  }
+
+  dataPrice[0] = parseInt(await price);
+  // spread price by level per stock
+
+  spread = await getSpread(await dataPrice[0], spreadPerLevel);
+
+  for (let i = 1; i < level; i++) {
+    dataPrice[i] = dataPrice[i - 1] - (await spread);
+  }
+
+  for (let i = 0; i < level; i++) {
+    dataPrice[i] = dataPrice[i].toString();
+  }
+
+  return dataPrice;
+}
+
+// get spesify buy price (sell by time == false)
+async function getBuyPriceSellTimeOff(
+  page,
+  price_type,
+  level,
+  spreadPerLevel,
+  lastPrice
+) {
+  let price;
+  let dataPrice = [];
+  let spread = 0;
+
+  if (lastPrice.length > 0) {
+    price = lastPrice[0] - 1;
+  } else {
+    if (price_type == "open") {
+      price = await getOpenPrice(page);
+    } else if (price_type == "prev") {
+      price = await getPrevClosePrice(page);
+    } else {
+      price = await getClosePrice(page);
+    }
   }
 
   dataPrice[0] = parseInt(await price);
@@ -1591,4 +1697,34 @@ async function sellByTimeOffTrigger(
       }
     }
   }
+}
+
+async function getLastPrice(user_id, stock) {
+  let prices = [];
+  let lastOrder = moment()
+    .subtract(1, "days")
+    .format("YYYY-MM-DD");
+
+  let err, initBuy;
+
+  [err, initBuy] = await to(
+    Init_Buy.findAll({ where: { user_id: user_id, stock: stock } })
+  );
+
+  if (initBuy.length > 0) {
+    let lastInitBuy = initBuy.filter(el => {
+      let orderDate = moment(el.order_date).format("YYYY-MM-DD");
+
+      return orderDate == lastOrder;
+    });
+
+    lastInitBuy.forEach(el => {
+      prices.push(el.price);
+    });
+
+    prices.sort(function(a, b) {
+      return a - b;
+    });
+  }
+  return prices;
 }
