@@ -654,7 +654,7 @@ async function stockInitBuySellTimeOff(
   await page.waitFor(4000);
 
   let stockBudget = dana_per_stock;
-  let lastPrice = await getLastPrice(user_id, stock);
+  // let lastPrice = await getLastPrice(user_id, stock);
 
   let price = await getBuyPriceSellTimeOff(
     page,
@@ -674,6 +674,13 @@ async function stockInitBuySellTimeOff(
       await page.click("button[id='_confirm']");
       await page.waitFor(1000);
       console.log("=-=-=-=-=BUY=-=-=-=-=", parseInt(price[i]));
+
+      await setInitBuySellTimeOff(user_id, stock, price[i]);
+
+      let err, initBuy;
+      [err, initBuy] = [err, security] = await to(
+        Security.create(security_info)
+      );
     }
   }
 
@@ -1071,16 +1078,24 @@ async function getBuyPriceSellTimeOff(
   let dataPrice = [];
   let spread = 0;
 
-  if (lastPrice.length > 0) {
-    price = lastPrice[0] - 1;
+  // if (lastPrice.length > 0) {
+  //   price = lastPrice[0] - 1;
+  // } else {
+  //   if (price_type == "open") {
+  //     price = await getOpenPrice(page);
+  //   } else if (price_type == "prev") {
+  //     price = await getPrevClosePrice(page);
+  //   } else {
+  //     price = await getClosePrice(page);
+  //   }
+  // }
+
+  if (price_type == "open") {
+    price = await getOpenPrice(page);
+  } else if (price_type == "prev") {
+    price = await getPrevClosePrice(page);
   } else {
-    if (price_type == "open") {
-      price = await getOpenPrice(page);
-    } else if (price_type == "prev") {
-      price = await getPrevClosePrice(page);
-    } else {
-      price = await getClosePrice(page);
-    }
+    price = await getClosePrice(page);
   }
 
   dataPrice[0] = parseInt(await price);
