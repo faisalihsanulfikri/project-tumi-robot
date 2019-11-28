@@ -40,8 +40,9 @@ module.exports.run = async function(req, res) {
    * OPEN BROWSER
    */
   const browser = await puppeteer.launch({
-    headless: false,
-    defaultViewport: null
+    headless: true,
+    defaultViewport: null,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
     // executablePath:
     //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   });
