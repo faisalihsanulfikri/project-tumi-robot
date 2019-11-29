@@ -89,45 +89,51 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
+  await withdraws(page, URL_accountinfo, robot_id, user_id);
+
+  // return res.json({
+  //   filterInit
+  // });
+
   /** END TEST */
 
   /** START */
 
   // validate buy time
-  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-    let now = moment().format("HH:mm:ss");
-    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-    let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+  //   let now = moment().format("HH:mm:ss");
+  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-    console.log("now", now);
-    console.log("buy_time", buy_time);
+  //   console.log("now", now);
+  //   console.log("buy_time", buy_time);
 
-    if (now >= buy_time) {
-      await setOffRobotStatus(robot_id, "finish");
+  //   if (now >= buy_time) {
+  //     await setOffRobotStatus(robot_id, "finish");
 
-      isMoreThanBuyTime.stop();
-      await main(
-        res,
-        page,
-        browser,
-        user_id,
-        settings,
-        price_type,
-        level_per_stock,
-        stock_value_data,
-        dana_per_stock,
-        robot_id,
-        URL_protofolio,
-        thisUser,
-        URL_accountinfo,
-        spreadPerLevel,
-        clValue,
-        profitPerLevel
-      );
-    }
-  });
+  //     isMoreThanBuyTime.stop();
+  //     await main(
+  //       res,
+  //       page,
+  //       browser,
+  //       user_id,
+  //       settings,
+  //       price_type,
+  //       level_per_stock,
+  //       stock_value_data,
+  //       dana_per_stock,
+  //       robot_id,
+  //       URL_protofolio,
+  //       thisUser,
+  //       URL_accountinfo,
+  //       spreadPerLevel,
+  //       clValue,
+  //       profitPerLevel
+  //     );
+  //   }
+  // });
 
-  isMoreThanBuyTime.start();
+  // isMoreThanBuyTime.start();
 
   /** END */
 
@@ -161,31 +167,31 @@ async function main(
 ) {
   let mainExec = [];
 
-  if (settings.is_sell_by_time == "true") {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-    mainExec[0] = await automationInitBuys(
-      page,
-      price_type,
-      level_per_stock,
-      stock_value_data,
-      dana_per_stock,
-      spreadPerLevel
-    );
-  } else {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-    mainExec[0] = await automationInitBuysSellTimeFalse(
-      page,
-      price_type,
-      level_per_stock,
-      stock_value_data,
-      dana_per_stock,
-      spreadPerLevel,
-      user_id
-    );
-  }
+  // if (settings.is_sell_by_time == "true") {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+  //   mainExec[0] = await automationInitBuys(
+  //     page,
+  //     price_type,
+  //     level_per_stock,
+  //     stock_value_data,
+  //     dana_per_stock,
+  //     spreadPerLevel
+  //   );
+  // } else {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+  //   mainExec[0] = await automationInitBuysSellTimeFalse(
+  //     page,
+  //     price_type,
+  //     level_per_stock,
+  //     stock_value_data,
+  //     dana_per_stock,
+  //     spreadPerLevel,
+  //     user_id
+  //   );
+  // }
 
-  mainExec[1] = await page.waitFor(5000);
-  // AUTOMATION
+  // mainExec[1] = await page.waitFor(5000);
+  // // AUTOMATION
   mainExec[2] = await automation(
     res,
     page,
@@ -1238,13 +1244,16 @@ async function getUpdateSettingData(page, URL_protofolio, thisUser) {
   await page.goto(URL_protofolio);
   await page.waitFor(1000);
 
+  let user_id = thisUser.user_id;
+  let setting = thisUser.setting;
+
   let cost_total = await page.evaluate(
     () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
   );
 
   thisUser.setting.cost_total = cost_total;
 
-  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+  let settings = await setSettings(user_id, setting);
 
   return await settings;
 }
@@ -1268,8 +1277,7 @@ async function setSettings(user_id, settings) {
     stock_value: settings.stock_value,
     cl_value: settings.cl_value,
     cl_time: settings.cl_time,
-    price_type: settings.price_type,
-    init_buy: "0"
+    price_type: settings.price_type
   };
 
   let updateData = {};
@@ -1390,6 +1398,8 @@ async function withdraws(page, URL_accountinfo, robot_id, user_id) {
     robot_id,
     user_id
   );
+  exec[3] = await page.waitFor(3000);
+  exec[4] = await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
 
   // run withdraw stock
   Promise.all(exec).then(() => {
