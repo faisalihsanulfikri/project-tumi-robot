@@ -1343,13 +1343,16 @@ async function getUpdateSettingData(page, URL_protofolio, thisUser) {
   await page.goto(URL_protofolio);
   await page.waitFor(1000);
 
+  let user_id = thisUser.user_id;
+  let setting = thisUser.setting;
+
   let cost_total = await page.evaluate(
     () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
   );
 
   thisUser.setting.cost_total = cost_total;
 
-  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+  let settings = await setSettings(user_id, setting);
 
   return await settings;
 }
@@ -1494,6 +1497,8 @@ async function withdraws(page, URL_accountinfo, robot_id, user_id) {
     robot_id,
     user_id
   );
+  exec[3] = await page.waitFor(3000);
+  exec[4] = await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
 
   // run withdraw stock
   Promise.all(exec).then(() => {
@@ -1562,15 +1567,16 @@ async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
   let dataWithdraw = [];
 
   dataGetWistdraw.forEach((el, i) => {
+    let formatProcessedAt = null;
     let getRequestTime = moment(el.request_time, "DD MMM YYYY");
     let formatRequestTime = moment(getRequestTime).format(
       "YYYY-MM-DD HH:mm:ss"
     );
 
-    let getProcessedAt = moment(el.processed_at, "DD MMM YYYY HH:mm");
-    let formatProcessedAt = moment(getProcessedAt).format(
-      "YYYY-MM-DD HH:mm:ss"
-    );
+    if (el.processed_at != "") {
+      let getProcessedAt = moment(el.processed_at, "DD MMM YYYY HH:mm");
+      formatProcessedAt = moment(getProcessedAt).format("YYYY-MM-DD HH:mm:ss");
+    }
 
     let amount = el.amount.replace(/,\s*/g, "");
 
@@ -1607,7 +1613,6 @@ async function setWithdrawData(page, URL_accountinfo, robot_id, user_id) {
       })
     );
     if (!uWithdraw) {
-      console.log(el);
       [err, uWithdraw] = await to(User_Withdraw.create(el));
     } else {
       uWithdraw.set(el);

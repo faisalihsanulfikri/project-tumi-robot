@@ -3,6 +3,7 @@ module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define(
     "Init_Buy",
     {
+      order_id: DataTypes.STRING,
       user_id: DataTypes.INTEGER,
       order_date: DataTypes.DATE,
       stock: DataTypes.STRING,
