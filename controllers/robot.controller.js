@@ -80,9 +80,10 @@ module.exports.run = async function(req, res) {
 
   // GET SETTING DATA
   let settings = await getSettingData(user_id);
+  let lastInit = await getLastInitBuysSells(user_id);
 
   // GET SETTING DATA IF SELL BY TIME IS TRUE
-  if (settings.is_sell_by_time == "true") {
+  if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
     settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
   }
 
@@ -103,40 +104,40 @@ module.exports.run = async function(req, res) {
   /** START */
 
   // validate buy time
-  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-  //   let now = moment().format("HH:mm:ss");
-  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+    let now = moment().format("HH:mm:ss");
+    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+    let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-  //   console.log("now", now);
-  //   console.log("buy_time", buy_time);
+    console.log("now", now);
+    console.log("buy_time", buy_time);
 
-  //   if (now >= buy_time) {
-  //     await setOffRobotStatus(robot_id, "finish");
+    if (now >= buy_time) {
+      await setOffRobotStatus(robot_id, "finish");
 
-  //     isMoreThanBuyTime.stop();
-  //     await main(
-  //       res,
-  //       page,
-  //       browser,
-  //       user_id,
-  //       settings,
-  //       price_type,
-  //       level_per_stock,
-  //       stock_value_data,
-  //       dana_per_stock,
-  //       robot_id,
-  //       URL_protofolio,
-  //       thisUser,
-  //       URL_accountinfo,
-  //       spreadPerLevel,
-  //       clValue,
-  //       profitPerLevel
-  //     );
-  //   }
-  // });
+      isMoreThanBuyTime.stop();
+      await main(
+        res,
+        page,
+        browser,
+        user_id,
+        settings,
+        price_type,
+        level_per_stock,
+        stock_value_data,
+        dana_per_stock,
+        robot_id,
+        URL_protofolio,
+        thisUser,
+        URL_accountinfo,
+        spreadPerLevel,
+        clValue,
+        profitPerLevel
+      );
+    }
+  });
 
-  // isMoreThanBuyTime.start();
+  isMoreThanBuyTime.start();
 
   /** END */
 
@@ -193,21 +194,21 @@ async function main(
     );
   }
 
-  // mainExec[1] = await page.waitFor(5000);
-  // // AUTOMATION
-  // mainExec[2] = await automation(
-  //   res,
-  //   page,
-  //   browser,
-  //   user_id,
-  //   settings,
-  //   robot_id,
-  //   URL_protofolio,
-  //   thisUser,
-  //   URL_accountinfo,
-  //   clValue,
-  //   profitPerLevel
-  // );
+  mainExec[1] = await page.waitFor(5000);
+  // AUTOMATION
+  mainExec[2] = await automation(
+    res,
+    page,
+    browser,
+    user_id,
+    settings,
+    robot_id,
+    URL_protofolio,
+    thisUser,
+    URL_accountinfo,
+    clValue,
+    profitPerLevel
+  );
 
   Promise.all(mainExec).then(() => {
     console.log("automationInitBuys automation finish!!!");
@@ -232,12 +233,18 @@ async function automation(
 ) {
   const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
-    await withdraws(page, URL_accountinfo, robot_id, user_id);
-    await page.waitFor(5000);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTtime = moment(settings.cl_time, "HH:mm:ss");
     let sell_time = moment(getSellTtime).format("HH:mm:ss");
+
+    // SET / UPDATE DATA TO TUMI DATABASE
+    await setTransactionData(page, user_id);
+    await page.waitFor(5000);
+    await automationPortofolio(page, URL_protofolio, user_id);
+    await page.waitFor(5000);
+    await withdraws(page, URL_accountinfo, robot_id, user_id);
+    await page.waitFor(5000);
 
     // TRANSACTION
     let transaction = await getTransaction(page);
@@ -1732,7 +1739,6 @@ async function getPortofolioRhb(page, URL_protofolio) {
 async function setProtofolioData(page, getPortofolio, user_id) {
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
-    // if (err) return res.json(err, 422);
 
     el.user_id = user_id;
     console.log(portofolios);
@@ -1741,16 +1747,14 @@ async function setProtofolioData(page, getPortofolio, user_id) {
       lastinsertId = portofolios.dataValues.id;
       // if (err) return ReE(res, err, 422);
     } else {
-      lastinsertId = portofolios.id;
       portofolios.set(el);
       [err, portofolios] = await to(portofolios.save());
+      lastinsertId = portofolios.dataValues.id;
       // if (err) return ReE(res, err, 422);
 
       //   }
     }
   });
-
-  // [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
   await page.waitFor(2000);
 
@@ -1821,11 +1825,15 @@ async function getLastInitBuysSells(user_id) {
 
 // set transaction
 async function setTransactionData(page, user_id) {
-  let getTransaction = await getTransaction(page);
+  let getDataTransaction = await getTransaction(page);
+
+  await page.waitFor(3000);
 
   let err, transaction;
 
-  getTransaction.forEach(async el => {
+  getDataTransaction.forEach(async el => {
+    el.user_id = user_id;
+    // set data
     [err, transaction] = await to(
       Transaction.findOne({ where: { order_id: el.order_id } })
     );
