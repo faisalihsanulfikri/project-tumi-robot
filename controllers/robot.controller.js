@@ -98,8 +98,6 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
-  await withdraws(page, URL_accountinfo, robot_id, user_id);
-
   /** END TEST */
 
   /** START */
