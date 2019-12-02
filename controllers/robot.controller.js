@@ -1506,7 +1506,14 @@ async function withdraws(page, URL_accountinfo, robot_id, user_id) {
 
 // get withdraw data
 async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
-  let now = moment().format("MM/01/YYYY");
+  // let lastInitBuy = [];
+  // let lastOrder = moment()
+  //   .subtract(1, "days")
+  //   .format("YYYY-MM-DD");
+
+  let now = moment()
+    .subtract(1, "months")
+    .format("MM/01/YYYY");
   await page.goto(URL_accountinfo);
   await page.waitFor(1000);
 
