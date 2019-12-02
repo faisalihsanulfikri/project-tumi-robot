@@ -1,7 +1,11 @@
+const { Init_Buy } = require("../models");
 const { Master_Setting } = require("../models");
+const { Portofolios } = require("../models");
+const { Portofolio_stocks } = require("../models");
 const { Robot } = require("../models");
 const { Security } = require("../models");
 const { Stock_Sell } = require("../models");
+const { Transaction } = require("../models");
 const { User } = require("../models");
 const { User_Setting } = require("../models");
 const { User_Withdraw } = require("../models");
@@ -14,6 +18,8 @@ const Tesseract = require("../node_modules/tesseract.js");
 const fs = require("fs");
 const moment = require("moment");
 const CronJob = require("cron").CronJob;
+
+require("dotenv").config();
 
 let globalIndex = 0;
 let globalIndex1 = 0;
@@ -40,9 +46,15 @@ module.exports.run = async function(req, res) {
   /**
    * OPEN BROWSER
    */
+  let getHeadless;
+  process.env.CHROMIUM_HEADLESS == "true"
+    ? (getHeadless = true)
+    : (getHeadless = false);
+
   const browser = await puppeteer.launch({
-    headless: false,
-    defaultViewport: null
+    headless: getHeadless,
+    defaultViewport: null,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
     // executablePath:
     //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   });
@@ -68,9 +80,10 @@ module.exports.run = async function(req, res) {
 
   // GET SETTING DATA
   let settings = await getSettingData(user_id);
+  let lastInit = await getLastInitBuysSells(user_id);
 
   // GET SETTING DATA IF SELL BY TIME IS TRUE
-  if (settings.is_sell_by_time == "true") {
+  if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
     settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
   }
 
@@ -85,49 +98,51 @@ module.exports.run = async function(req, res) {
   let clValue = await settings.cl_value;
 
   /** TEST */
-    await inputStockRangking(page)
+  
   /** END TEST */
 
   /** START */
 
   // validate buy time
-  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-  //   let now = moment().format("HH:mm:ss");
-  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+    let now = moment().format("HH:mm:ss");
+    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+    let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-  //   console.log("now", now);
-  //   console.log("buy_time", buy_time);
+    console.log("now", now);
+    console.log("buy_time", buy_time);
 
-  //   if (now >= buy_time) {
-  //     await setOffRobotStatus(robot_id, "finish");
+    if (now >= buy_time) {
+      await setOffRobotStatus(robot_id, "finish");
 
-  //     isMoreThanBuyTime.stop();
-  //     await main(
-  //       res,
-  //       page,
-  //       browser,
-  //       user_id,
-  //       settings,
-  //       price_type,
-  //       level_per_stock,
-  //       stock_value_data,
-  //       dana_per_stock,
-  //       robot_id,
-  //       URL_protofolio,
-  //       thisUser,
-  //       URL_accountinfo,
-  //       spreadPerLevel
-  //     );
-  //   }
-  // });
+      isMoreThanBuyTime.stop();
+      await main(
+        res,
+        page,
+        browser,
+        user_id,
+        settings,
+        price_type,
+        level_per_stock,
+        stock_value_data,
+        dana_per_stock,
+        robot_id,
+        URL_protofolio,
+        thisUser,
+        URL_accountinfo,
+        spreadPerLevel,
+        clValue,
+        profitPerLevel
+      );
+    }
+  });
 
-  // isMoreThanBuyTime.start();
+  isMoreThanBuyTime.start();
 
   /** END */
 
   await setOffRobotStatus(robot_id, "finish");
-  await browser.close();
+  // await browser.close();
 
   return res.json({
     success: 1,
@@ -150,19 +165,34 @@ async function main(
   URL_protofolio,
   thisUser,
   URL_accountinfo,
-  spreadPerLevel
+  spreadPerLevel,
+  clValue,
+  profitPerLevel
 ) {
   let mainExec = [];
 
-  // AUTOMATION INITIATION BUY
-  mainExec[0] = await automationInitBuys(
-    page,
-    price_type,
-    level_per_stock,
-    stock_value_data,
-    dana_per_stock,
-    spreadPerLevel
-  );
+  if (settings.is_sell_by_time == "true") {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+    mainExec[0] = await automationInitBuys(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel
+    );
+  } else {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+    mainExec[0] = await automationInitBuysSellTimeFalse(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel,
+      user_id
+    );
+  }
 
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
@@ -175,7 +205,9 @@ async function main(
     robot_id,
     URL_protofolio,
     thisUser,
-    URL_accountinfo
+    URL_accountinfo,
+    clValue,
+    profitPerLevel
   );
 
   Promise.all(mainExec).then(() => {
@@ -195,16 +227,24 @@ async function automation(
   robot_id,
   URL_protofolio,
   thisUser,
-  URL_accountinfo
+  URL_accountinfo,
+  clValue,
+  profitPerLevel
 ) {
   const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
-    await withdraws(page, URL_accountinfo, robot_id, user_id);
-    await page.waitFor(5000);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTtime = moment(settings.cl_time, "HH:mm:ss");
     let sell_time = moment(getSellTtime).format("HH:mm:ss");
+
+    // SET / UPDATE DATA TO TUMI DATABASE
+    await setTransactionData(page, user_id);
+    await page.waitFor(5000);
+    await automationPortofolio(page, URL_protofolio, user_id);
+    await page.waitFor(5000);
+    await withdraws(page, URL_accountinfo, robot_id, user_id);
+    await page.waitFor(5000);
 
     // TRANSACTION
     let transaction = await getTransaction(page);
@@ -235,7 +275,7 @@ async function automation(
         let message = "Robot has done.";
         let exec = [];
 
-        exec[0] = await sellByTimeTrigger(page, user_id);
+        exec[0] = await sellByTimeOnTrigger(page, user_id);
         exec[1] = await page.waitFor(1500);
         exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
         exec[3] = await page.waitFor(1500);
@@ -249,6 +289,14 @@ async function automation(
           );
         });
       }
+    } else {
+      await sellByTimeOffTrigger(
+        page,
+        URL_protofolio,
+        user_id,
+        clValue,
+        profitPerLevel
+      );
     }
 
     console.log("globalIndex = ", globalIndex);
@@ -258,7 +306,7 @@ async function automation(
   job.start();
 }
 
-// automation initiation buys
+// automation initiation buys (is_sell_by_time == true)
 async function automationInitBuys(
   page,
   price_type,
@@ -287,6 +335,58 @@ async function automationInitBuys(
   // run initiation buy stock
   Promise.all(stocksInitBuy).then(() => {
     console.log("finish initiation buy!!!");
+  });
+}
+
+// automation initiation buys  (is_sell_by_time == false)
+async function automationInitBuysSellTimeFalse(
+  page,
+  price_type,
+  level_per_stock,
+  stock_value_data,
+  dana_per_stock,
+  spreadPerLevel,
+  user_id
+) {
+  let lastInit = await getLastInitBuysSells(user_id);
+  let stocksInitSell = [];
+  let stocksInitBuy = [];
+
+  // init stock
+  if (lastInit.length > 0) {
+    for (let i = 0; i < lastInit.length; i++) {
+      if (lastInit[i].mode == "Buy") {
+        stocksInitBuy.push(await stockInitBuySellTimeOff(page, lastInit[i]));
+      } else {
+        stocksInitSell.push(await stockInitSellSellTimeOff(page, lastInit[i]));
+      }
+    }
+  } else {
+    for (let i = 0; i < stock_value_data.length; i++) {
+      for (let idx = 0; idx < level_per_stock; idx++) {
+        stocksInitBuy.push(
+          await stockInitBuy(
+            page,
+            price_type,
+            level_per_stock,
+            stock_value_data[i],
+            dana_per_stock,
+            idx,
+            spreadPerLevel
+          )
+        );
+      }
+    }
+  }
+
+  // run initiation buy stock
+  Promise.all(stocksInitSell).then(() => {
+    console.log("finish initiation sell (sell by time off) !!!");
+  });
+
+  // run initiation buy stock
+  Promise.all(stocksInitBuy).then(() => {
+    console.log("finish initiation buy (sell by time off) !!!");
   });
 }
 
@@ -418,7 +518,7 @@ async function automationSellByTimes(page, openStockSells, user_id) {
   });
 }
 
-// automation withdraw stock sell
+// automation withdraw stock sell (sell by time on)
 async function automationWithdrawStockSell(page, withdrawData) {
   let data = await withdrawData;
   let withdrawStockSell = [];
@@ -429,6 +529,23 @@ async function automationWithdrawStockSell(page, withdrawData) {
         await setWithdrawStockSell(page, await data[i], i)
       );
     }
+  }
+
+  // run withdraw stock
+  Promise.all(withdrawStockSell).then(() => {
+    console.log("withdrawStockSell finish!!!");
+  });
+}
+
+// automation withdraw stock sell (sell by time off)
+async function automationWithdrawStockSellOff(page, withdrawData) {
+  let data = await withdrawData;
+  let withdrawStockSell = [];
+
+  for (let i = data.length - 1; i >= 0; i--) {
+    withdrawStockSell.push(
+      await setWithdrawStockSell(page, await data[i], data[i].index)
+    );
   }
 
   // run withdraw stock
@@ -472,8 +589,8 @@ async function automationSetWithdrawRhb(
   });
 }
 
-// sell by time trigger
-async function sellByTimeTrigger(page, user_id) {
+// sell by time on trigger
+async function sellByTimeOnTrigger(page, user_id) {
   let transaction = await getTransaction(page);
   await page.waitFor(1000);
 
@@ -505,7 +622,66 @@ async function sellByTimeTrigger(page, user_id) {
   }
 }
 
-// set init buy stocks
+// sell by time off trigger
+async function sellByTimeOffTrigger(
+  page,
+  URL_protofolio,
+  user_id,
+  clValue,
+  profitPerLevel
+) {
+  let data = await automationPortofolio(page, URL_protofolio, user_id);
+  await page.waitFor(1000);
+
+  let filterStockProtofolio = await data.table.map(el => ({
+    stock: el.stock,
+    last: el.last
+  }));
+
+  // TRANSACTION
+  let transaction = await getTransaction(page);
+  await page.waitFor(1000);
+
+  // get open stock
+  let stockOpen = transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (stockOpen.length > 0) {
+    let mapStockOpen = stockOpen.map((el, i) => ({
+      ...el,
+      index: i
+    }));
+
+    mapStockOpen.forEach((el, i) => {
+      let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
+      let price = parseInt(el.price);
+
+      el.last = parseInt(dataLast[0].last);
+      el.cl = Math.round(price - (price * clValue) / 100);
+      el.tp = Math.round(price + (price * profitPerLevel) / 100);
+    });
+
+    // get tp or cl
+    let tpclStock = await getTpClStock(mapStockOpen);
+
+    if (tpclStock.length > 0) {
+      let tpclStockSell = await tpclStock.filter(el => {
+        return el.mode == "Sell";
+      });
+
+      if (tpclStockSell.length > 0) {
+        await automationWithdrawStockSellOff(page, tpclStockSell);
+
+        await page.waitFor(2000);
+
+        await automationSellByTimes(page, tpclStockSell, user_id);
+      }
+    }
+  }
+}
+
+// set init buy stocks (sell by time == true)
 async function stockInitBuy(
   page,
   price_type,
@@ -543,6 +719,66 @@ async function stockInitBuy(
   console.log("price ", await price);
   console.log("lot ", lot);
   console.log("price[] ", await price[i]);
+  console.log("finish");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// set init buy stocks (sell by time == false)
+async function stockInitBuySellTimeOff(page, lastInit) {
+  const URL_orderpad_buy =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
+
+  let stock = lastInit.stock;
+  let price = lastInit.price.toString();
+  let lots = lastInit.lots.toString();
+
+  await page.goto(URL_orderpad_buy);
+  await page.type("input[id='_stockCode']", stock);
+
+  if (parseInt(price) >= 50) {
+    await page.type("input[id='_price']", price);
+    await page.type("input[id='_volume']", lots);
+    await page.click("button[id='_enter']");
+    await page.waitFor(1000);
+    await page.click("button[id='_confirm']");
+    await page.waitFor(1000);
+    console.log("=-=-=-=-=BUY INIT=-=-=-=-=", parseInt(price));
+  }
+
+  console.log("price ", price);
+  console.log("lot ", lots);
+  console.log("finish");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// set init sell stocks (sell by time == false)
+async function stockInitSellSellTimeOff(page, lastInit) {
+  const URL_orderpad_sell =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
+
+  let stock = lastInit.stock;
+  let price = lastInit.price.toString();
+  let lots = lastInit.lots.toString();
+
+  await page.goto(URL_orderpad_sell);
+  await page.type("input[id='_stockCode']", stock);
+
+  if (parseInt(price) >= 50) {
+    await page.type("input[id='_price']", price);
+    await page.type("input[id='_volume']", lots);
+    await page.click("button[id='_enter']");
+    await page.waitFor(1000);
+    await page.click("button[id='_confirm']");
+    await page.waitFor(1000);
+    console.log("=-=-=-=-=SELL INIT=-=-=-=-=", parseInt(price));
+  }
+
+  console.log("price ", price);
+  console.log("lot ", lots);
   console.log("finish");
   console.log("##############################################");
 
@@ -704,80 +940,77 @@ async function getTransaction(page) {
 
 // get stock rangking
 async function stockRanking(page) {
-
   await page.goto(
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/stock_ranking.jsp"
   );
 
-  await page.click("button[onclick='loadData();']")
+  await page.click("button[onclick='loadData();']");
 
   await page.waitFor(3000);
 
-  await page.click("th[aria-label='Chg%: activate to sort column ascending']")
-  await page.click("th[class='title-content sorting_asc']")
-  
+  await page.click("th[aria-label='Chg%: activate to sort column ascending']");
+  await page.click("th[class='title-content sorting_asc']");
+
   await page.waitFor(1000);
 
-  
   const first_data = await page.evaluate(() => {
-    let table = document.querySelector("#_tsorter")
-    let row = table.children
-    let page1 = []
+    let table = document.querySelector("#_tsorter");
+    let row = table.children;
+    let page1 = [];
     for (let i = 0; i < row.length; i++) {
       const el = row[i];
-      let item = el.children
-      
-      let result = {}
+      let item = el.children;
 
-      result['stock'] = item[0].textContent
-      result['prev'] = item[1].textContent
-      result['open'] = item[2].textContent
-      result['high'] = item[3].textContent
-      result['low'] = item[4].textContent
-      result['last'] = item[5].textContent
-      result['chg'] = item[6].textContent
-      result['chg_percent'] = item[7].textContent
-      result['freq'] = item[8].textContent
-      result['vol'] = item[9].textContent
-      result['val'] = item[10].textContent
+      let result = {};
 
-      page1.push(result)
+      result["stock"] = item[0].textContent;
+      result["prev"] = item[1].textContent;
+      result["open"] = item[2].textContent;
+      result["high"] = item[3].textContent;
+      result["low"] = item[4].textContent;
+      result["last"] = item[5].textContent;
+      result["chg"] = item[6].textContent;
+      result["chg_percent"] = item[7].textContent;
+      result["freq"] = item[8].textContent;
+      result["vol"] = item[9].textContent;
+      result["val"] = item[10].textContent;
+
+      page1.push(result);
     }
-    return page1
-  })
+    return page1;
+  });
 
-  await page.click("a[data-dt-idx='2']")
+  await page.click("a[data-dt-idx='2']");
 
   const second_data = await page.evaluate(() => {
-    let table = document.querySelector("#_tsorter")
-    let row = table.children
-    let page2 = []
+    let table = document.querySelector("#_tsorter");
+    let row = table.children;
+    let page2 = [];
     for (let i = 0; i < row.length; i++) {
       const el = row[i];
-      let item = el.children
-      
-      let result = {}
+      let item = el.children;
 
-      result['stock'] = item[0].textContent
-      result['prev'] = item[1].textContent
-      result['open'] = item[2].textContent
-      result['high'] = item[3].textContent
-      result['low'] = item[4].textContent
-      result['last'] = item[5].textContent
-      result['chg'] = item[6].textContent
-      result['chg_percent'] = item[7].textContent
-      result['freq'] = item[8].textContent
-      result['vol'] = item[9].textContent
-      result['val'] = item[10].textContent
+      let result = {};
 
-      page2.push(result)
+      result["stock"] = item[0].textContent;
+      result["prev"] = item[1].textContent;
+      result["open"] = item[2].textContent;
+      result["high"] = item[3].textContent;
+      result["low"] = item[4].textContent;
+      result["last"] = item[5].textContent;
+      result["chg"] = item[6].textContent;
+      result["chg_percent"] = item[7].textContent;
+      result["freq"] = item[8].textContent;
+      result["vol"] = item[9].textContent;
+      result["val"] = item[10].textContent;
+
+      page2.push(result);
     }
-    return page2
-  })
-  let fulldata = first_data.concat(second_data)
+    return page2;
+  });
+  let fulldata = first_data.concat(second_data);
   // console.log(fulldata)
-  return fulldata
-  
+  return fulldata;
 }
 
 // input stock rangking
@@ -786,14 +1019,14 @@ async function inputStockRangking(page) {
   let stock_rangking,getStockrangking,stock,stock_rangkings,err;
 
   getStockrangking = await stockRanking(page);
-  
+
   // const browser = await puppeteer.launch({
   //     headless: true,
   //     defaultViewport: null
   //   });
 
   //   const page = await browser.newPage();
-      await page.waitFor(1000);
+  await page.waitFor(1000);
 
       // console.log(stock)
       // stock_rangkings.set(element)
@@ -1004,7 +1237,7 @@ async function getBidPrice(page) {
   );
 }
 
-// get spesify buy price
+// get spesify buy price (sell by time == true)
 async function getBuyPrice(page, price_type, level, spreadPerLevel) {
   let price;
   let dataPrice = [];
@@ -1129,13 +1362,16 @@ async function getUpdateSettingData(page, URL_protofolio, thisUser) {
   await page.goto(URL_protofolio);
   await page.waitFor(1000);
 
+  let user_id = thisUser.user_id;
+  let setting = thisUser.setting;
+
   let cost_total = await page.evaluate(
     () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
   );
 
   thisUser.setting.cost_total = cost_total;
 
-  let settings = await setSettings(thisUser.user_id, thisUser.setting);
+  let settings = await setSettings(user_id, setting);
 
   return await settings;
 }
@@ -1280,6 +1516,8 @@ async function withdraws(page, URL_accountinfo, robot_id, user_id) {
     robot_id,
     user_id
   );
+  exec[3] = await page.waitFor(3000);
+  exec[4] = await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
 
   // run withdraw stock
   Promise.all(exec).then(() => {
@@ -1289,7 +1527,14 @@ async function withdraws(page, URL_accountinfo, robot_id, user_id) {
 
 // get withdraw data
 async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
-  let now = moment().format("MM/01/YYYY");
+  // let lastInitBuy = [];
+  // let lastOrder = moment()
+  //   .subtract(1, "days")
+  //   .format("YYYY-MM-DD");
+
+  let now = moment()
+    .subtract(1, "months")
+    .format("MM/01/YYYY");
   await page.goto(URL_accountinfo);
   await page.waitFor(1000);
 
@@ -1348,15 +1593,16 @@ async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
   let dataWithdraw = [];
 
   dataGetWistdraw.forEach((el, i) => {
+    let formatProcessedAt = null;
     let getRequestTime = moment(el.request_time, "DD MMM YYYY");
     let formatRequestTime = moment(getRequestTime).format(
       "YYYY-MM-DD HH:mm:ss"
     );
 
-    let getProcessedAt = moment(el.processed_at, "DD MMM YYYY HH:mm");
-    let formatProcessedAt = moment(getProcessedAt).format(
-      "YYYY-MM-DD HH:mm:ss"
-    );
+    if (el.processed_at != "") {
+      let getProcessedAt = moment(el.processed_at, "DD MMM YYYY HH:mm");
+      formatProcessedAt = moment(getProcessedAt).format("YYYY-MM-DD HH:mm:ss");
+    }
 
     let amount = el.amount.replace(/,\s*/g, "");
 
@@ -1393,7 +1639,6 @@ async function setWithdrawData(page, URL_accountinfo, robot_id, user_id) {
       })
     );
     if (!uWithdraw) {
-      console.log(el);
       [err, uWithdraw] = await to(User_Withdraw.create(el));
     } else {
       uWithdraw.set(el);
@@ -1427,4 +1672,220 @@ async function updateWithdrawData(requrstWithdraw) {
 
   withdraw.set(updateData);
   [err, withdraw] = await to(withdraw.save());
+}
+
+// get portofolio rhb
+async function getPortofolioRhb(page, URL_protofolio) {
+  await page.goto(URL_protofolio);
+  await page.waitFor(2000);
+
+  const headData = {};
+
+  let startingBalance = await page.evaluate(
+    () => document.querySelector("div[id='_startingBalance']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let availableLimit = await page.evaluate(
+    () => document.querySelector("div[id='_availableLimit']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let fundingAvailable = await page.evaluate(
+    () => document.querySelector("div[id='_fundingAvailable']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let totalAsset = await page.evaluate(
+    () => document.querySelector("div[id='_totalAsset']").innerHTML
+  );
+  await page.waitFor(1000);
+
+  let cashRdn = await page.evaluate(
+    () => document.querySelector("div[id='_cashRdn']").innerHTML
+  );
+  await page.waitFor(1000);
+  const item = [];
+
+  (headData["starting_balance"] = await startingBalance.replace(/,\s*/g, "")),
+    (headData["available_limit"] = await availableLimit.replace(/,\s*/g, "")),
+    (headData["funding_available"] = await fundingAvailable.replace(
+      /,\s*/g,
+      ""
+    )),
+    (headData["total_asset"] = await totalAsset.replace(/,\s*/g, "")),
+    (headData["cash_in_rdn"] = await cashRdn.replace(/,\s*/g, "")),
+    item.push(headData);
+
+  await page.waitFor(1000);
+  const table = await page.evaluate(() => {
+    return new Promise((resolve, reject) => {
+      let table = document.querySelector("#_portfolio");
+      let row = table.children;
+      let items = [];
+      let length = [];
+      length = row.length - 1;
+
+      for (let i = 0; i < length; i++) {
+        let result = {};
+        const tr = row[i];
+        const text = tr.children;
+        if (!text[i].textContent) {
+        } else {
+          result["stock"] = text[0].textContent;
+          (result["avg_buy"] = text[1].textContent.replace(/,\s*/g, "")),
+            (result["last"] = text[2].textContent);
+          (result["gross_value"] = text[6].textContent.replace(/,\s*/g, "")),
+            (result["market_value"] = text[7].textContent.replace(/,\s*/g, "")),
+            (result["pl_price"] = text[10].textContent.replace(/,\s*/g, "")),
+            (result["pl_percent"] = text[11].textContent.replace(/,\s*/g, "")),
+            items.push(result);
+        }
+      }
+      resolve(items);
+    });
+  });
+
+  return { item, table };
+}
+
+// set protofolio data
+async function setProtofolioData(page, getPortofolio, user_id) {
+  getPortofolio.item.forEach(async el => {
+    [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
+
+    el.user_id = user_id;
+    console.log(portofolios);
+    if (!portofolios) {
+      [err, portofolios] = await to(Portofolios.create(el));
+      lastinsertId = portofolios.dataValues.id;
+      // if (err) return ReE(res, err, 422);
+    } else {
+      portofolios.set(el);
+      [err, portofolios] = await to(portofolios.save());
+      lastinsertId = portofolios.dataValues.id;
+      // if (err) return ReE(res, err, 422);
+
+      //   }
+    }
+  });
+
+  await page.waitFor(2000);
+
+  getPortofolio.table.forEach(async el => {
+    [err, portofolio_stock] = await to(
+      Portofolio_stocks.findOne({ where: { user_id: user_id } })
+    );
+    // if (portofolio_stock) return ReE(res, err, 422);
+
+    // console.log(stock.dataValues.id)
+    el.portofolio_id = lastinsertId;
+    el.user_id = user_id;
+    // console.log(portofolio_stock)
+    if (!portofolio_stock) {
+      [err, portofolio_stock] = await to(Portofolio_stocks.create(el));
+      // if (portofolio_stock) return ReE(res, err, 422);
+    } else {
+      portofolio_stock.set(el);
+      [err, portofolio_stock] = await to(portofolio_stock.save());
+      // if (err) return ReE(res, err, 422);
+    }
+  });
+}
+
+// automation protofolio
+async function automationPortofolio(page, URL_protofolio, user_id) {
+  let exec = [];
+
+  exec[0] = await getPortofolioRhb(page, URL_protofolio);
+  exec[1] = await page.waitFor(1000);
+  exec[2] = await console.log("portofolio", await exec[0]);
+  exec[3] = await page.waitFor(1000);
+  exec[4] = await setProtofolioData(page, exec[0], user_id);
+
+  Promise.all(exec).then(() => {
+    console.log("getPortofolioRhb setProtofolioData finish!!!");
+  });
+
+  return await exec[0];
+}
+
+// get data if last more than tp or last less than cl
+async function getTpClStock(matchStockSells) {
+  return matchStockSells.filter(el => el.tp >= el.last || el.cl <= el.last);
+}
+
+// get last init sell
+async function getLastInitBuysSells(user_id) {
+  let lastInitBuy = [];
+  let lastOrder = moment()
+    .subtract(1, "days")
+    .format("YYYY-MM-DD");
+
+  let err, initBuy;
+
+  [err, initBuy] = await to(Init_Buy.findAll({ where: { user_id: user_id } }));
+
+  if (initBuy.length > 0) {
+    lastInitBuy = initBuy.filter(el => {
+      let orderDate = moment(el.order_date).format("YYYY-MM-DD");
+
+      return orderDate == lastOrder;
+    });
+  }
+
+  return lastInitBuy;
+}
+
+// set transaction
+async function setTransactionData(page, user_id) {
+  let getDataTransaction = await getTransaction(page);
+
+  await page.waitFor(3000);
+
+  let err, transaction;
+
+  getDataTransaction.forEach(async el => {
+    el.user_id = user_id;
+    // set data
+    [err, transaction] = await to(
+      Transaction.findOne({ where: { order_id: el.order_id } })
+    );
+    if (!transaction) {
+      console.log(el);
+      [err, transaction] = await to(Transaction.create(el));
+      if (err) return ReE(res, err, 422);
+    } else {
+      transaction.set(el);
+      [err, transaction] = await to(transaction.save());
+      if (err) return ReE(res, err, 422);
+    }
+  });
+}
+
+// set last init sell by time off
+async function setInitBuySell(page, user_id) {
+  let now = moment().format("YYYY-MM-DD HH:mm:ss");
+  let transaction = await getTransaction(page);
+
+  let filterInit = await transaction.filter(el => {
+    return el.status == "Open";
+  });
+
+  if (filterInit.length > 0) {
+    filterInit.forEach(async el => {
+      let orderDate = moment().format("YYYY-MM-DD");
+      let orderDateTime = orderDate + " " + el.order_time;
+      let data = {
+        user_id: user_id,
+        order_date: orderDateTime,
+        stock: el.stock,
+        price: el.price,
+        mode: el.mode,
+        updatedAt: now,
+        lots: el.lots
+      };
+      [err, initBuy] = await to(Init_Buy.create(data));
+    });
+  }
 }
