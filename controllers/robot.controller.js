@@ -19,6 +19,8 @@ const fs = require("fs");
 const moment = require("moment");
 const CronJob = require("cron").CronJob;
 
+require("dotenv").config();
+
 let globalIndex = 0;
 let globalIndex1 = 0;
 let globalIndex2 = 0;
@@ -44,10 +46,15 @@ module.exports.run = async function(req, res) {
   /**
    * OPEN BROWSER
    */
+  let getHeadless;
+  process.env.CHROMIUM_HEADLESS == "true"
+    ? (getHeadless = true)
+    : (getHeadless = false);
+
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: getHeadless,
     defaultViewport: null,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
     // executablePath:
     //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   });
@@ -91,45 +98,47 @@ module.exports.run = async function(req, res) {
 
   /** TEST */
 
+  await withdraws(page, URL_accountinfo, robot_id, user_id);
+
   /** END TEST */
 
   /** START */
 
   // validate buy time
-  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-    let now = moment().format("HH:mm:ss");
-    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-    let buy_time = moment(getBuyTime).format("HH:mm:ss");
+  // const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+  //   let now = moment().format("HH:mm:ss");
+  //   let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+  //   let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-    console.log("now", now);
-    console.log("buy_time", buy_time);
+  //   console.log("now", now);
+  //   console.log("buy_time", buy_time);
 
-    if (now >= buy_time) {
-      await setOffRobotStatus(robot_id, "finish");
+  //   if (now >= buy_time) {
+  //     await setOffRobotStatus(robot_id, "finish");
 
-      isMoreThanBuyTime.stop();
-      await main(
-        res,
-        page,
-        browser,
-        user_id,
-        settings,
-        price_type,
-        level_per_stock,
-        stock_value_data,
-        dana_per_stock,
-        robot_id,
-        URL_protofolio,
-        thisUser,
-        URL_accountinfo,
-        spreadPerLevel,
-        clValue,
-        profitPerLevel
-      );
-    }
-  });
+  //     isMoreThanBuyTime.stop();
+  //     await main(
+  //       res,
+  //       page,
+  //       browser,
+  //       user_id,
+  //       settings,
+  //       price_type,
+  //       level_per_stock,
+  //       stock_value_data,
+  //       dana_per_stock,
+  //       robot_id,
+  //       URL_protofolio,
+  //       thisUser,
+  //       URL_accountinfo,
+  //       spreadPerLevel,
+  //       clValue,
+  //       profitPerLevel
+  //     );
+  //   }
+  // });
 
-  isMoreThanBuyTime.start();
+  // isMoreThanBuyTime.start();
 
   /** END */
 
@@ -186,21 +195,21 @@ async function main(
     );
   }
 
-  mainExec[1] = await page.waitFor(5000);
-  // AUTOMATION
-  mainExec[2] = await automation(
-    res,
-    page,
-    browser,
-    user_id,
-    settings,
-    robot_id,
-    URL_protofolio,
-    thisUser,
-    URL_accountinfo,
-    clValue,
-    profitPerLevel
-  );
+  // mainExec[1] = await page.waitFor(5000);
+  // // AUTOMATION
+  // mainExec[2] = await automation(
+  //   res,
+  //   page,
+  //   browser,
+  //   user_id,
+  //   settings,
+  //   robot_id,
+  //   URL_protofolio,
+  //   thisUser,
+  //   URL_accountinfo,
+  //   clValue,
+  //   profitPerLevel
+  // );
 
   Promise.all(mainExec).then(() => {
     console.log("automationInitBuys automation finish!!!");
@@ -335,8 +344,8 @@ async function automationInitBuysSellTimeFalse(
   user_id
 ) {
   let lastInit = await getLastInitBuysSells(user_id);
-  let stocksInitBuy = [];
   let stocksInitSell = [];
+  let stocksInitBuy = [];
 
   // init stock
   if (lastInit.length > 0) {
@@ -366,13 +375,13 @@ async function automationInitBuysSellTimeFalse(
   }
 
   // run initiation buy stock
-  Promise.all(stocksInitBuy).then(() => {
-    console.log("finish initiation buy (sell by time off) !!!");
+  Promise.all(stocksInitSell).then(() => {
+    console.log("finish initiation sell (sell by time off) !!!");
   });
 
   // run initiation buy stock
-  Promise.all(stocksInitSell).then(() => {
-    console.log("finish initiation sell (sell by time off) !!!");
+  Promise.all(stocksInitBuy).then(() => {
+    console.log("finish initiation buy (sell by time off) !!!");
   });
 }
 
@@ -926,101 +935,96 @@ async function getTransaction(page) {
 
 // get stock rangking
 async function stockRanking(page) {
-
   await page.goto(
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/stock_ranking.jsp"
   );
 
-  await page.click("button[onclick='loadData();']")
+  await page.click("button[onclick='loadData();']");
 
   await page.waitFor(3000);
 
-  await page.click("th[aria-label='Chg%: activate to sort column ascending']")
-  await page.click("th[class='title-content sorting_asc']")
-  
+  await page.click("th[aria-label='Chg%: activate to sort column ascending']");
+  await page.click("th[class='title-content sorting_asc']");
+
   await page.waitFor(1000);
 
-  
   const first_data = await page.evaluate(() => {
-    let table = document.querySelector("#_tsorter")
-    let row = table.children
-    let page1 = []
+    let table = document.querySelector("#_tsorter");
+    let row = table.children;
+    let page1 = [];
     for (let i = 0; i < row.length; i++) {
       const el = row[i];
-      let item = el.children
-      
-      let result = {}
+      let item = el.children;
 
-      result['stock'] = item[0].textContent
-      result['prev'] = item[1].textContent
-      result['open'] = item[2].textContent
-      result['high'] = item[3].textContent
-      result['low'] = item[4].textContent
-      result['last'] = item[5].textContent
-      result['chg'] = item[6].textContent
-      result['chg_percent'] = item[7].textContent
-      result['freq'] = item[8].textContent
-      result['vol'] = item[9].textContent
-      result['val'] = item[10].textContent
+      let result = {};
 
-      page1.push(result)
+      result["stock"] = item[0].textContent;
+      result["prev"] = item[1].textContent;
+      result["open"] = item[2].textContent;
+      result["high"] = item[3].textContent;
+      result["low"] = item[4].textContent;
+      result["last"] = item[5].textContent;
+      result["chg"] = item[6].textContent;
+      result["chg_percent"] = item[7].textContent;
+      result["freq"] = item[8].textContent;
+      result["vol"] = item[9].textContent;
+      result["val"] = item[10].textContent;
+
+      page1.push(result);
     }
-    return page1
-  })
+    return page1;
+  });
 
-  await page.click("a[data-dt-idx='2']")
+  await page.click("a[data-dt-idx='2']");
 
   const second_data = await page.evaluate(() => {
-    let table = document.querySelector("#_tsorter")
-    let row = table.children
-    let page2 = []
+    let table = document.querySelector("#_tsorter");
+    let row = table.children;
+    let page2 = [];
     for (let i = 0; i < row.length; i++) {
       const el = row[i];
-      let item = el.children
-      
-      let result = {}
+      let item = el.children;
 
-      result['stock'] = item[0].textContent
-      result['prev'] = item[1].textContent
-      result['open'] = item[2].textContent
-      result['high'] = item[3].textContent
-      result['low'] = item[4].textContent
-      result['last'] = item[5].textContent
-      result['chg'] = item[6].textContent
-      result['chg_percent'] = item[7].textContent
-      result['freq'] = item[8].textContent
-      result['vol'] = item[9].textContent
-      result['val'] = item[10].textContent
+      let result = {};
 
-      page2.push(result)
+      result["stock"] = item[0].textContent;
+      result["prev"] = item[1].textContent;
+      result["open"] = item[2].textContent;
+      result["high"] = item[3].textContent;
+      result["low"] = item[4].textContent;
+      result["last"] = item[5].textContent;
+      result["chg"] = item[6].textContent;
+      result["chg_percent"] = item[7].textContent;
+      result["freq"] = item[8].textContent;
+      result["vol"] = item[9].textContent;
+      result["val"] = item[10].textContent;
+
+      page2.push(result);
     }
-    return page2
-  })
-  let fulldata = first_data.concat(second_data)
+    return page2;
+  });
+  let fulldata = first_data.concat(second_data);
   // console.log(fulldata)
-  return fulldata
-  
+  return fulldata;
 }
 
 // input stock rangking
 async function inputStockRangking(page) {
-  
-  let stock_rangking,getStockrangking,stock,err;
+  let stock_rangking, getStockrangking, stock, err;
 
   getStockrangking = await stockRanking(page);
-  
+
   // const browser = await puppeteer.launch({
   //     headless: true,
   //     defaultViewport: null
   //   });
 
   //   const page = await browser.newPage();
-      await page.waitFor(1000);
+  await page.waitFor(1000);
 
-      getStockrangking.forEach(async el => {
-          [err, stock_rangking] = await to(Stock_rangking.create(el));
-        
-    });
+  getStockrangking.forEach(async el => {
+    [err, stock_rangking] = await to(Stock_rangking.create(el));
+  });
 }
 
 // get Users
@@ -1369,8 +1373,7 @@ async function setSettings(user_id, settings) {
     stock_value: settings.stock_value,
     cl_value: settings.cl_value,
     cl_time: settings.cl_time,
-    price_type: settings.price_type,
-    init_buy: "0"
+    price_type: settings.price_type
   };
 
   let updateData = {};
