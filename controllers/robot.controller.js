@@ -285,13 +285,13 @@ async function automation(
         let exec = [];
 
         exec[0] = await sellByTimeOnTrigger(page, user_id);
-        exec[1] = await page.waitFor(1500);
+        exec[1] = await page.waitFor(5000);
         exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
-        exec[3] = await page.waitFor(1500);
+        exec[3] = await page.waitFor(5000);
         exec[4] = await setTransactionData(page, user_id);
-        exec[5] = await page.waitFor(1500);
+        exec[5] = await page.waitFor(5000);
         exec[6] = await setOffRobotStatus(robot_id, message);
-        exec[7] = await page.waitFor(1500);
+        exec[7] = await page.waitFor(5000);
         exec[8] = await browser.close();
 
         Promise.all(exec).then(() => {
@@ -318,11 +318,11 @@ async function automation(
         let exec = [];
 
         exec[0] = await setInitBuySell(page, user_id);
-        exec[1] = await page.waitFor(1500);
+        exec[1] = await page.waitFor(5000);
         exec[4] = await setTransactionData(page, user_id);
-        exec[5] = await page.waitFor(1500);
+        exec[5] = await page.waitFor(5000);
         exec[6] = await setOffRobotStatus(robot_id, message);
-        exec[7] = await page.waitFor(1500);
+        exec[7] = await page.waitFor(5000);
         exec[8] = await browser.close();
 
         Promise.all(exec).then(() => {
@@ -1874,7 +1874,7 @@ async function getLastInitBuysSells(user_id) {
 async function setTransactionData(page, user_id) {
   let getDataTransaction = await getTransaction(page);
 
-  await page.waitFor(3000);
+  await page.waitFor(4000);
 
   let err, transaction;
 
