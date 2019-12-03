@@ -86,10 +86,6 @@ module.exports.run = async function(req, res) {
   let settings = await getSettingData(user_id);
   let lastInit = await getLastInitBuysSells(user_id);
 
-  console.log("lastInit", lastInit);
-
-  return;
-
   // GET SETTING DATA IF SELL BY TIME IS TRUE
   if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
     settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
