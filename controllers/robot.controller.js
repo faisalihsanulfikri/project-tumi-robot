@@ -98,7 +98,7 @@ module.exports.run = async function(req, res) {
   let clValue = await settings.cl_value;
 
   /** TEST */
-
+  
   /** END TEST */
 
   /** START */
@@ -1015,7 +1015,8 @@ async function stockRanking(page) {
 
 // input stock rangking
 async function inputStockRangking(page) {
-  let stock_rangking, getStockrangking, stock, err;
+  
+  let stock_rangking,getStockrangking,stock,stock_rangkings,err;
 
   getStockrangking = await stockRanking(page);
 
@@ -1027,9 +1028,22 @@ async function inputStockRangking(page) {
   //   const page = await browser.newPage();
   await page.waitFor(1000);
 
-  getStockrangking.forEach(async el => {
-    [err, stock_rangking] = await to(Stock_rangking.create(el));
-  });
+      // console.log(stock)
+      // stock_rangkings.set(element)
+      Promise.all([
+        [err, stock_rangkings] = await to(Stock_rangking.findAll({ raw: true })),
+        stock_rangkings.forEach(async element => {
+          [err, stock_rangkings] = await to(Stock_rangking.findOne({ where: {id: element.id } })),
+            // console.log(stock_rangkings)
+              [err, stock_rangkings] = await to(stock_rangkings.destroy())
+            }),
+
+          getStockrangking.forEach(async el => {
+              [err, stock_rangking] = await to(Stock_rangking.create(el));
+            
+        }),
+          ]);
+
 }
 
 // get Users
