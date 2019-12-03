@@ -86,6 +86,10 @@ module.exports.run = async function(req, res) {
   let settings = await getSettingData(user_id);
   let lastInit = await getLastInitBuysSells(user_id);
 
+  console.log("lastInit", lastInit);
+
+  return;
+
   // GET SETTING DATA IF SELL BY TIME IS TRUE
   if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
     settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
@@ -1887,11 +1891,9 @@ async function setTransactionData(page, user_id) {
     if (!transaction) {
       console.log(el);
       [err, transaction] = await to(Transaction.create(el));
-      if (err) return ReE(res, err, 422);
     } else {
       transaction.set(el);
       [err, transaction] = await to(transaction.save());
-      if (err) return ReE(res, err, 422);
     }
   });
 }
