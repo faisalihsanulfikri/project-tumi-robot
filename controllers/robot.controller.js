@@ -36,6 +36,10 @@ module.exports.run = async function(req, res) {
   const URL_accountinfo =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/accountinfo.jsp";
 
+  /** TEST */
+
+  /** END TEST */
+
   let thisUser = await getUsers(robot_id);
 
   let username = thisUser.security_user_id;
@@ -98,7 +102,7 @@ module.exports.run = async function(req, res) {
   let clValue = await settings.cl_value;
 
   /** TEST */
-  
+
   /** END TEST */
 
   /** START */
@@ -231,12 +235,14 @@ async function automation(
   clValue,
   profitPerLevel
 ) {
-  const job = new CronJob("*/60 * * * * *", async function() {
+  const job = new CronJob("*/90 * * * * *", async function() {
     // INNITIATION
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
-    let getSellTtime = moment(settings.cl_time, "HH:mm:ss");
-    let sell_time = moment(getSellTtime).format("HH:mm:ss");
+    let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+    let sell_time = moment(getSellTime).format("HH:mm:ss");
+    let getCloseTime = moment("16:05:00", "HH:mm:ss");
+    let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
     // SET / UPDATE DATA TO TUMI DATABASE
     await setTransactionData(page, user_id);
@@ -244,6 +250,8 @@ async function automation(
     await automationPortofolio(page, URL_protofolio, user_id);
     await page.waitFor(5000);
     await withdraws(page, URL_accountinfo, robot_id, user_id);
+    await page.waitFor(5000);
+    await inputStockRangking(page);
     await page.waitFor(5000);
 
     // TRANSACTION
@@ -268,6 +276,7 @@ async function automation(
       await automationBuys(page, matchStockSells, user_id);
     }
 
+    // SELL BY TIME (ON)
     if (is_sell_by_time == "true") {
       if (now > sell_time) {
         job.stop();
@@ -279,17 +288,20 @@ async function automation(
         exec[1] = await page.waitFor(1500);
         exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
         exec[3] = await page.waitFor(1500);
-        exec[4] = await setOffRobotStatus(robot_id, message);
+        exec[4] = await setTransactionData(page, user_id);
         exec[5] = await page.waitFor(1500);
-        exec[6] = await browser.close();
+        exec[6] = await setOffRobotStatus(robot_id, message);
+        exec[7] = await page.waitFor(1500);
+        exec[8] = await browser.close();
 
         Promise.all(exec).then(() => {
           console.log(
-            "sellByTimeTrigger getUpdateSettingData setOffRobotStatus finish!!!"
+            "sellByTimeTrigger getUpdateSettingData setTransactionData setOffRobotStatus finish!!!"
           );
         });
       }
     } else {
+      // SELL BY TIME (OFF)
       await sellByTimeOffTrigger(
         page,
         URL_protofolio,
@@ -297,6 +309,28 @@ async function automation(
         clValue,
         profitPerLevel
       );
+
+      // TURN OFF ROBOT
+      if (now > closeTime) {
+        job.stop();
+
+        let message = "Robot has done.";
+        let exec = [];
+
+        exec[0] = await setInitBuySell(page, user_id);
+        exec[1] = await page.waitFor(1500);
+        exec[4] = await setTransactionData(page, user_id);
+        exec[5] = await page.waitFor(1500);
+        exec[6] = await setOffRobotStatus(robot_id, message);
+        exec[7] = await page.waitFor(1500);
+        exec[8] = await browser.close();
+
+        Promise.all(exec).then(() => {
+          console.log(
+            "setInitBuySell setTransactionData setOffRobotStatus finish!!!"
+          );
+        });
+      }
     }
 
     console.log("globalIndex = ", globalIndex);
@@ -1015,8 +1049,7 @@ async function stockRanking(page) {
 
 // input stock rangking
 async function inputStockRangking(page) {
-  
-  let stock_rangking,getStockrangking,stock,stock_rangkings,err;
+  let stock_rangking, getStockrangking, stock, stock_rangkings, err;
 
   getStockrangking = await stockRanking(page);
 
@@ -1028,22 +1061,22 @@ async function inputStockRangking(page) {
   //   const page = await browser.newPage();
   await page.waitFor(1000);
 
-      // console.log(stock)
-      // stock_rangkings.set(element)
-      Promise.all([
-        [err, stock_rangkings] = await to(Stock_rangking.findAll({ raw: true })),
-        stock_rangkings.forEach(async element => {
-          [err, stock_rangkings] = await to(Stock_rangking.findOne({ where: {id: element.id } })),
-            // console.log(stock_rangkings)
-              [err, stock_rangkings] = await to(stock_rangkings.destroy())
-            }),
+  // console.log(stock)
+  // stock_rangkings.set(element)
+  Promise.all([
+    ([err, stock_rangkings] = await to(Stock_rangking.findAll({ raw: true }))),
+    stock_rangkings.forEach(async element => {
+      ([err, stock_rangkings] = await to(
+        Stock_rangking.findOne({ where: { id: element.id } })
+      )),
+        // console.log(stock_rangkings)
+        ([err, stock_rangkings] = await to(stock_rangkings.destroy()));
+    }),
 
-          getStockrangking.forEach(async el => {
-              [err, stock_rangking] = await to(Stock_rangking.create(el));
-            
-        }),
-          ]);
-
+    getStockrangking.forEach(async el => {
+      [err, stock_rangking] = await to(Stock_rangking.create(el));
+    })
+  ]);
 }
 
 // get Users
