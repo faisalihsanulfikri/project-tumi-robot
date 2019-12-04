@@ -26,6 +26,10 @@ let globalIndex1 = 0;
 let globalIndex2 = 0;
 
 module.exports.run = async function(req, res) {
+
+  return res.json({
+    data : "test"
+  })
   let robot_id = req.params.robot_id;
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
