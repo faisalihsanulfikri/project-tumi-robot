@@ -26,9 +26,6 @@ let globalIndex1 = 0;
 let globalIndex2 = 0;
 
 module.exports.run = async function(req, res) {
-  return res.json({
-    data: "test"
-  });
   let robot_id = req.params.robot_id;
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
@@ -183,28 +180,28 @@ async function main(
 ) {
   let mainExec = [];
 
-  if (settings.is_sell_by_time == "true") {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-    mainExec[0] = await automationInitBuys(
-      page,
-      price_type,
-      level_per_stock,
-      stock_value_data,
-      dana_per_stock,
-      spreadPerLevel
-    );
-  } else {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-    mainExec[0] = await automationInitBuysSellTimeFalse(
-      page,
-      price_type,
-      level_per_stock,
-      stock_value_data,
-      dana_per_stock,
-      spreadPerLevel,
-      user_id
-    );
-  }
+  // if (settings.is_sell_by_time == "true") {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+  //   mainExec[0] = await automationInitBuys(
+  //     page,
+  //     price_type,
+  //     level_per_stock,
+  //     stock_value_data,
+  //     dana_per_stock,
+  //     spreadPerLevel
+  //   );
+  // } else {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+  //   mainExec[0] = await automationInitBuysSellTimeFalse(
+  //     page,
+  //     price_type,
+  //     level_per_stock,
+  //     stock_value_data,
+  //     dana_per_stock,
+  //     spreadPerLevel,
+  //     user_id
+  //   );
+  // }
 
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
