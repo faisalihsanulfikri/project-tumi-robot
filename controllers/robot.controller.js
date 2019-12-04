@@ -211,7 +211,8 @@ async function main(
     thisUser,
     URL_accountinfo,
     clValue,
-    profitPerLevel
+    profitPerLevel,
+    spreadPerLevel
   );
 
   Promise.all(mainExec).then(() => {
@@ -233,10 +234,12 @@ async function automation(
   thisUser,
   URL_accountinfo,
   clValue,
-  profitPerLevel
+  profitPerLevel,
+  spreadPerLevel
 ) {
   const job = new CronJob("*/90 * * * * *", async function() {
     // INNITIATION
+    let settings = await getSettingData(user_id);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTime = moment(settings.cl_time, "HH:mm:ss");
@@ -247,16 +250,16 @@ async function automation(
     // SET / UPDATE DATA TO TUMI DATABASE
     await setTransactionData(page, user_id);
     await page.waitFor(5000);
-    // await automationPortofolio(page, URL_protofolio, user_id);
-    // await page.waitFor(5000);
-    // await withdraws(page, URL_accountinfo, robot_id, user_id);
-    // await page.waitFor(5000);
-    // await inputStockRangking(page);
-    // await page.waitFor(5000);
+    await automationPortofolio(page, URL_protofolio, user_id);
+    await page.waitFor(5000);
+    await withdraws(page, URL_accountinfo, robot_id, user_id);
+    await page.waitFor(5000);
+    await inputStockRangking(page);
+    await page.waitFor(5000);
 
     // TRANSACTION
     let transaction = await getTransaction(page);
-    await page.waitFor(1000);
+    await page.waitFor(3000);
 
     // AUTOMATION SELL
     let matchStockBuys = await transaction.filter(el => {
@@ -264,7 +267,7 @@ async function automation(
     });
 
     if (matchStockBuys.length > 0) {
-      await automationSells(page, matchStockBuys, user_id);
+      await automationSells(page, matchStockBuys, user_id, spreadPerLevel);
     }
 
     // AUTOMATION BUY
@@ -273,7 +276,7 @@ async function automation(
     });
 
     if (matchStockSells.length > 0) {
-      await automationBuys(page, matchStockSells, user_id);
+      await automationBuys(page, matchStockSells, user_id, spreadPerLevel);
     }
 
     // SELL BY TIME (ON)
@@ -425,8 +428,9 @@ async function automationInitBuysSellTimeFalse(
 }
 
 // automation sells
-async function automationSells(page, matchStockBuys, user_id) {
-  let dataStockSell = await matchStockBuys.map(el => {
+async function automationSells(page, matchStockBuys, user_id, spreadPerLevel) {
+  let dataStockSell = await matchStockBuys.map(async el => {
+    let spread = await getSpread(parseInt(el.price), spreadPerLevel);
     return {
       order_id: el.order_id,
       user_id: user_id,
@@ -435,7 +439,7 @@ async function automationSells(page, matchStockBuys, user_id) {
       lots: el.lots,
       status: el.status,
       priceBuy: el.price,
-      priceSell: (parseInt(el.price) + 1).toString(),
+      priceSell: (parseInt(el.price) + spread).toString(),
       createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
       updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
     };
@@ -468,8 +472,9 @@ async function automationSells(page, matchStockBuys, user_id) {
 }
 
 // automation buys
-async function automationBuys(page, matchStockSells, user_id) {
-  let dataStockBuy = await matchStockSells.map(el => {
+async function automationBuys(page, matchStockSells, user_id, spreadPerLevel) {
+  let dataStockBuy = await matchStockSells.map(async el => {
+    let spread = await getSpread(parseInt(el.price), spreadPerLevel);
     return {
       order_id: el.order_id,
       user_id: user_id,
@@ -477,7 +482,7 @@ async function automationBuys(page, matchStockSells, user_id) {
       mode: el.mode,
       lots: el.lots,
       status: el.status,
-      priceBuy: (parseInt(el.price) - 1).toString(),
+      priceBuy: (parseInt(el.price) - spread).toString(),
       priceSell: el.price,
       createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
       updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
