@@ -26,6 +26,9 @@ let globalIndex1 = 0;
 let globalIndex2 = 0;
 
 module.exports.run = async function(req, res) {
+  return res.json({
+    data: "test"
+  });
   let robot_id = req.params.robot_id;
   const URL_login =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
@@ -55,103 +58,108 @@ module.exports.run = async function(req, res) {
     ? (getHeadless = true)
     : (getHeadless = false);
 
-  const browser = await puppeteer.launch({
-    headless: getHeadless,
-    defaultViewport: null,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    // executablePath:
-    //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-  });
+  try {
+    const browser = await puppeteer.launch({
+      headless: getHeadless,
+      defaultViewport: null,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      // executablePath:
+      //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    });
 
-  /**
-   * OPEN RHB PAGE
-   */
-  const page = await browser.newPage();
+    /**
+     * OPEN RHB PAGE
+     */
+    const page = await browser.newPage();
 
-  page.on("dialog", async dialog => {
-    await dialog.accept();
-  });
+    page.on("dialog", async dialog => {
+      await dialog.accept();
+    });
 
-  await page.goto(URL_login);
-  await page.waitFor(2000);
+    await page.goto(URL_login);
+    await page.waitFor(2000);
 
-  // LOGIN RHB
-  await login(page, username, password, robot_id);
-  await setOnRobotStatus(robot_id);
+    // LOGIN RHB
+    await login(page, username, password, robot_id);
+    await setOnRobotStatus(robot_id);
 
-  // LOGIN TRADING
-  await loginTrading(page, URL_runningTrade, pin);
+    // LOGIN TRADING
+    await loginTrading(page, URL_runningTrade, pin);
 
-  // GET SETTING DATA
-  let settings = await getSettingData(user_id);
-  let lastInit = await getLastInitBuysSells(user_id);
+    // GET SETTING DATA
+    let settings = await getSettingData(user_id);
+    let lastInit = await getLastInitBuysSells(user_id);
 
-  // GET SETTING DATA IF SELL BY TIME IS TRUE
-  if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
-    settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
-  }
-
-  let price_type = await settings.price_type;
-  let level_per_stock = parseInt(await settings.level_per_stock);
-  let stock_value_string = await settings.stock_value;
-  let stock_value_data = await stock_value_string.split(",", 4);
-  let cost_total = await settings.cost_total;
-  let dana_per_stock = await settings.dana_per_stock;
-  let spreadPerLevel = await settings.spread_per_level;
-  let profitPerLevel = await settings.profit_per_level;
-  let clValue = await settings.cl_value;
-
-  /** TEST */
-
-  /** END TEST */
-
-  /** START */
-
-  // validate buy time
-  const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
-    let now = moment().format("HH:mm:ss");
-    let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-    let buy_time = moment(getBuyTime).format("HH:mm:ss");
-
-    console.log("now", now);
-    console.log("buy_time", buy_time);
-
-    if (now >= buy_time) {
-      // await setOffRobotStatus(robot_id, "finish");
-
-      isMoreThanBuyTime.stop();
-      await main(
-        res,
-        page,
-        browser,
-        user_id,
-        settings,
-        price_type,
-        level_per_stock,
-        stock_value_data,
-        dana_per_stock,
-        robot_id,
-        URL_protofolio,
-        thisUser,
-        URL_accountinfo,
-        spreadPerLevel,
-        clValue,
-        profitPerLevel
-      );
+    // GET SETTING DATA IF SELL BY TIME IS TRUE
+    if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
+      settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
     }
-  });
 
-  isMoreThanBuyTime.start();
+    let price_type = await settings.price_type;
+    let level_per_stock = parseInt(await settings.level_per_stock);
+    let stock_value_string = await settings.stock_value;
+    let stock_value_data = await stock_value_string.split(",", 4);
+    let cost_total = await settings.cost_total;
+    let dana_per_stock = await settings.dana_per_stock;
+    let spreadPerLevel = await settings.spread_per_level;
+    let profitPerLevel = await settings.profit_per_level;
+    let clValue = await settings.cl_value;
 
-  /** END */
+    /** TEST */
 
-  // await setOffRobotStatus(robot_id, "finish");
-  // await browser.close();
+    /** END TEST */
 
-  return res.json({
-    success: 1,
-    message: "Robot already run."
-  });
+    /** START */
+
+    // validate buy time
+    const isMoreThanBuyTime = new CronJob("*/60 * * * * *", async function() {
+      let now = moment().format("HH:mm:ss");
+      let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+      let buy_time = moment(getBuyTime).format("HH:mm:ss");
+
+      console.log("now", now);
+      console.log("buy_time", buy_time);
+
+      if (now >= buy_time) {
+        // await setOffRobotStatus(robot_id, "finish");
+
+        isMoreThanBuyTime.stop();
+        await main(
+          res,
+          page,
+          browser,
+          user_id,
+          settings,
+          price_type,
+          level_per_stock,
+          stock_value_data,
+          dana_per_stock,
+          robot_id,
+          URL_protofolio,
+          thisUser,
+          URL_accountinfo,
+          spreadPerLevel,
+          clValue,
+          profitPerLevel
+        );
+      }
+    });
+
+    isMoreThanBuyTime.start();
+
+    /** END */
+
+    // await setOffRobotStatus(robot_id, "finish");
+    // await browser.close();
+
+    return res.json({
+      success: 1,
+      message: "Robot already run."
+    });
+  } catch (error) {
+    let msg = "Gagal terhubung dengan RHB";
+    await closeErrorRobot(page, msg, robot_id);
+  }
 };
 
 // main automation
@@ -1351,48 +1359,58 @@ async function getLot(stockBudget, level, price) {
 
 // login
 async function login(page, username, password, robot_id) {
-  await page.type("input[id='j_username']", username);
-  await page.type("input[id='password']", password);
+  try {
+    await page.type("input[id='j_username']", username);
+    await page.type("input[id='password']", password);
 
-  await page.waitForSelector("img[alt='athentication token']");
-  await page.evaluate(() => {
-    document.querySelector(".form-login").style.backgroundColor = "white";
-    document.querySelector("img[alt='athentication token']").style.transform =
-      "scale(2.2) skew(-60deg, 5deg)";
-    document.querySelector("img[alt='athentication token']").style.filter =
-      "grayscale(1) brightness(3) contrast(10)";
-  });
+    await page.waitForSelector("img[alt='athentication token']");
+    await page.evaluate(() => {
+      document.querySelector(".form-login").style.backgroundColor = "white";
+      document.querySelector("img[alt='athentication token']").style.transform =
+        "scale(2.2) skew(-60deg, 5deg)";
+      document.querySelector("img[alt='athentication token']").style.filter =
+        "grayscale(1) brightness(3) contrast(10)";
+    });
 
-  let captcha = await page.$("img[alt='athentication token']");
-  await captcha.screenshot({
-    path: "./public/images/captcha/captcha" + robot_id + ".png",
-    omitBackground: true
-  });
+    let captcha = await page.$("img[alt='athentication token']");
+    await captcha.screenshot({
+      path: "./public/images/captcha/captcha" + robot_id + ".png",
+      omitBackground: true
+    });
 
-  let tokenCaptcha = await Tesseract.recognize(
-    "./public/images/captcha/captcha" + robot_id + ".png",
-    "eng",
-    {
-      logger: m => console.log(m)
-    }
-  ).then(({ data: { text } }) => {
-    token = text.replace(/\D+/g, "").trim();
-    token.toString().substring(0, 4);
-    return token;
-  });
+    let tokenCaptcha = await Tesseract.recognize(
+      "./public/images/captcha/captcha" + robot_id + ".png",
+      "eng",
+      {
+        logger: m => console.log(m)
+      }
+    ).then(({ data: { text } }) => {
+      token = text.replace(/\D+/g, "").trim();
+      token.toString().substring(0, 4);
+      return token;
+    });
 
-  console.log("token ", tokenCaptcha);
+    console.log("token ", tokenCaptcha);
 
-  await page.type("input[id='j_token']", tokenCaptcha);
-  await page.click("button[type=submit]");
+    await page.type("input[id='j_token']", tokenCaptcha);
+    await page.click("button[type=submit]");
+  } catch (error) {
+    let msg = "Gagal bypass captcha";
+    await closeErrorRobot(page, msg, robot_id);
+  }
 }
 
 // login trading
 async function loginTrading(page, URL_runningTrade, pin) {
-  await page.goto(URL_runningTrade);
-  await page.click("button[onclick='objPopup.showLoginTrading();']");
-  await page.type("input[id='_ltPin']", pin);
-  await page.click("input[id='_ltEnter']");
+  try {
+    await page.goto(URL_runningTrade);
+    await page.click("button[onclick='objPopup.showLoginTrading();']");
+    await page.type("input[id='_ltPin']", pin);
+    await page.click("input[id='_ltEnter']");
+  } catch (error) {
+    let msg = "Gagal login pin trading";
+    await closeErrorRobot(page, msg, robot_id);
+  }
 }
 
 // get update setting data
@@ -1924,4 +1942,18 @@ async function setInitBuySell(page, user_id) {
       [err, initBuy] = await to(Init_Buy.create(data));
     });
   }
+}
+
+// close error robot
+async function closeErrorRobot(page, msg, robot_id) {
+  let message = msg;
+  let exec = [];
+
+  exec[0] = await setOffRobotStatus(robot_id, message);
+  exec[1] = await page.waitFor(1500);
+  exec[2] = await browser.close();
+
+  Promise.all(exec).then(() => {
+    console.log("setOffRobotStatus finish!!!");
+  });
 }

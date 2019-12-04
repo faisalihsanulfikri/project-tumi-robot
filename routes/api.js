@@ -1,13 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
-const SecurityController = require("../controllers/security.controller");
-const SettingController = require("../controllers/setting.controller");
 const UserController = require("../controllers/user.controller");
-const TransactionController = require("../controllers/transaction.controller");
 const RobotController = require("../controllers/robot.controller");
-const PortofolioController = require("../controllers/portofolio.controller");
-const SpreadsheetController = require("../controllers/spreadsheet.controller");
 
 const custom = require("./../middleware/custom");
 
@@ -24,13 +19,13 @@ router.get("/", function(req, res, next) {
   });
 });
 
-router.post("/robot/run/:robot_id", RobotController.run);
+router.post("/auth/login", UserController.login);
 
-// router.post(
-//   "/robot/run/:robot_id",
-//   passport.authenticate("jwt", { session: false }),
-//   RobotController.run
-// );
+router.post(
+  "/robot/run/:robot_id",
+  passport.authenticate("jwt", { session: false }),
+  RobotController.run
+);
 
 //********* API DOCUMENTATION **********
 router.use(
