@@ -477,8 +477,8 @@ async function automationBuys(page, matchStockSells, user_id) {
       mode: el.mode,
       lots: el.lots,
       status: el.status,
-      priceBuy: el.price,
-      priceSell: (parseInt(el.price) + 1).toString(),
+      priceBuy: (parseInt(el.price) - 1).toString(),
+      priceSell: el.price,
       createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
       updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
     };
