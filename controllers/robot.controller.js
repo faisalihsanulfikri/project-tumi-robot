@@ -247,12 +247,12 @@ async function automation(
     // SET / UPDATE DATA TO TUMI DATABASE
     await setTransactionData(page, user_id);
     await page.waitFor(5000);
-    await automationPortofolio(page, URL_protofolio, user_id);
-    await page.waitFor(5000);
-    await withdraws(page, URL_accountinfo, robot_id, user_id);
-    await page.waitFor(5000);
-    await inputStockRangking(page);
-    await page.waitFor(5000);
+    // await automationPortofolio(page, URL_protofolio, user_id);
+    // await page.waitFor(5000);
+    // await withdraws(page, URL_accountinfo, robot_id, user_id);
+    // await page.waitFor(5000);
+    // await inputStockRangking(page);
+    // await page.waitFor(5000);
 
     // TRANSACTION
     let transaction = await getTransaction(page);
