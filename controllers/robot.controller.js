@@ -117,7 +117,7 @@ module.exports.run = async function(req, res) {
     console.log("buy_time", buy_time);
 
     if (now >= buy_time) {
-      await setOffRobotStatus(robot_id, "finish");
+      // await setOffRobotStatus(robot_id, "finish");
 
       isMoreThanBuyTime.stop();
       await main(
