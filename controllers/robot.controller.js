@@ -145,7 +145,7 @@ module.exports.run = async function(req, res) {
 
   /** END */
 
-  await setOffRobotStatus(robot_id, "finish");
+  // await setOffRobotStatus(robot_id, "finish");
   // await browser.close();
 
   return res.json({
