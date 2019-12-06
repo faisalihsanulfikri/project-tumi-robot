@@ -630,18 +630,20 @@ async function automationSetWithdrawRhb(
 
   console.log("requrstWithdraw", await requrstWithdraw.length);
 
-  let execWithdraw = [];
-  for (let i = 0; i < (await requrstWithdraw.length); i++) {
-    execWithdraw.push(
-      await setWithdrawRhb(page, URL_accountinfo, await requrstWithdraw[i])
-    );
-    await updateWithdrawData(await requrstWithdraw[i]);
-  }
+  if (requrstWithdraw.length > 0) {
+    let execWithdraw = [];
+    for (let i = 0; i < (await requrstWithdraw.length); i++) {
+      execWithdraw.push(
+        await setWithdrawRhb(page, URL_accountinfo, await requrstWithdraw[i])
+      );
+      await updateWithdrawData(await requrstWithdraw[i]);
+    }
 
-  // run sell stock
-  Promise.all(execWithdraw).then(() => {
-    console.log("execWithdraw finish!!!");
-  });
+    // run sell stock
+    Promise.all(execWithdraw).then(() => {
+      console.log("execWithdraw finish!!!");
+    });
+  }
 }
 
 // sell by time on trigger
