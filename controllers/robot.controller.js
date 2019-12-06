@@ -47,7 +47,7 @@ module.exports.run = async function(req, res) {
 
   /** END TEST */
 
-  console.log("Robot " + robot_id + " - " + name);
+  console.log("Robot " + robot_id);
 
   /**
    * OPEN BROWSER
@@ -182,28 +182,28 @@ async function main(
 ) {
   let mainExec = [];
 
-  // if (settings.is_sell_by_time == "true") {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-  //   mainExec[0] = await automationInitBuys(
-  //     page,
-  //     price_type,
-  //     level_per_stock,
-  //     stock_value_data,
-  //     dana_per_stock,
-  //     spreadPerLevel
-  //   );
-  // } else {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-  //   mainExec[0] = await automationInitBuysSellTimeFalse(
-  //     page,
-  //     price_type,
-  //     level_per_stock,
-  //     stock_value_data,
-  //     dana_per_stock,
-  //     spreadPerLevel,
-  //     user_id
-  //   );
-  // }
+  if (settings.is_sell_by_time == "true") {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+    mainExec[0] = await automationInitBuys(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel
+    );
+  } else {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+    mainExec[0] = await automationInitBuysSellTimeFalse(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel,
+      user_id
+    );
+  }
 
   mainExec[1] = await page.waitFor(5000);
   // // AUTOMATION
@@ -312,11 +312,11 @@ async function automation(
 
         // exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
         // exec[3] = await page.waitFor(5000);
-        exec[4] = await setTransactionData(page, user_id, spreadPerLevel);
-        exec[5] = await page.waitFor(5000);
-        exec[6] = await setOffRobotStatus(robot_id, message);
-        exec[7] = await page.waitFor(5000);
-        exec[8] = await browser.close();
+        exec[0] = await setTransactionData(page, user_id, spreadPerLevel);
+        exec[1] = await page.waitFor(5000);
+        exec[3] = await setOffRobotStatus(robot_id, message);
+        exec[4] = await page.waitFor(5000);
+        exec[5] = await browser.close();
 
         Promise.all(exec).then(() => {
           console.log(
@@ -2141,7 +2141,6 @@ async function closeErrorRobot(page, msg, robot_id) {
   let exec = [];
 
   exec[0] = await setOffRobotStatus(robot_id, message);
-  exec[1] = await page.waitFor(1500);
   exec[2] = await browser.close();
 
   Promise.all(exec).then(() => {
