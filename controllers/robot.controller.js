@@ -4,6 +4,7 @@ const { Portofolios } = require("../models");
 const { Portofolio_stocks } = require("../models");
 const { Robot } = require("../models");
 const { Security } = require("../models");
+const { Sell_Times } = require("../models");
 const { Stock_Sell } = require("../models");
 const { Transaction } = require("../models");
 const { User } = require("../models");
@@ -22,8 +23,6 @@ const CronJob = require("cron").CronJob;
 require("dotenv").config();
 
 let globalIndex = 0;
-let globalIndex1 = 0;
-let globalIndex2 = 0;
 
 module.exports.run = async function(req, res) {
   let robot_id = req.params.robot_id;
@@ -36,16 +35,19 @@ module.exports.run = async function(req, res) {
   const URL_accountinfo =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/accountinfo.jsp";
 
-  /** TEST */
-
-  /** END TEST */
-
   let thisUser = await getUsers(robot_id);
 
+  let name = thisUser.username;
   let username = thisUser.security_user_id;
   let password = thisUser.password;
   let pin = thisUser.pin;
   let user_id = thisUser.user_id;
+
+  /** TEST */
+
+  /** END TEST */
+
+  console.log("Robot " + robot_id);
 
   /**
    * OPEN BROWSER
@@ -180,31 +182,31 @@ async function main(
 ) {
   let mainExec = [];
 
-  // if (settings.is_sell_by_time == "true") {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-  //   mainExec[0] = await automationInitBuys(
-  //     page,
-  //     price_type,
-  //     level_per_stock,
-  //     stock_value_data,
-  //     dana_per_stock,
-  //     spreadPerLevel
-  //   );
-  // } else {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-  //   mainExec[0] = await automationInitBuysSellTimeFalse(
-  //     page,
-  //     price_type,
-  //     level_per_stock,
-  //     stock_value_data,
-  //     dana_per_stock,
-  //     spreadPerLevel,
-  //     user_id
-  //   );
-  // }
+  if (settings.is_sell_by_time == "true") {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+    mainExec[0] = await automationInitBuys(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel
+    );
+  } else {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+    mainExec[0] = await automationInitBuysSellTimeFalse(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel,
+      user_id
+    );
+  }
 
   mainExec[1] = await page.waitFor(5000);
-  // AUTOMATION
+  // // AUTOMATION
   mainExec[2] = await automation(
     res,
     page,
@@ -242,69 +244,83 @@ async function automation(
   profitPerLevel,
   spreadPerLevel
 ) {
-  const job = new CronJob("*/90 * * * * *", async function() {
+  const job = new CronJob("*/60 * * * * *", async function() {
     // INNITIATION
-    let settings = await getSettingData(user_id);
+    settings = await getSettingData(user_id);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTime = moment(settings.cl_time, "HH:mm:ss");
     let sell_time = moment(getSellTime).format("HH:mm:ss");
-    let getCloseTime = moment("16:05:00", "HH:mm:ss");
+    let getCloseTime = moment("16:15:00", "HH:mm:ss");
     let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
     // SET / UPDATE DATA TO TUMI DATABASE
-    await setTransactionData(page, user_id);
+    let transaction = await setTransactionData(page, user_id, spreadPerLevel);
     await page.waitFor(5000);
     await automationPortofolio(page, URL_protofolio, user_id);
     await page.waitFor(5000);
+
+    let matchStockBuy = transaction.matchStockBuy;
+    let matchStockSell = transaction.matchStockSell;
+    let openStockBuy = transaction.openStockBuy;
+    let openStockSell = transaction.openStockSell;
+
+    let openStock = transaction.openStock;
+
+    // AUTOMATION SELL
+    if (matchStockSell.length > 0) {
+      await automationSells(page, matchStockSell);
+    }
+
+    // AUTOMATION BUY
+    if (matchStockBuy.length > 0) {
+      await automationBuys(page, matchStockBuy);
+    }
+
     await withdraws(page, URL_accountinfo, robot_id, user_id);
     await page.waitFor(5000);
     await inputStockRangking(page);
     await page.waitFor(5000);
 
-    // TRANSACTION
-    let transaction = await getTransaction(page);
-    await page.waitFor(3000);
-
-    // AUTOMATION SELL
-    let matchStockBuys = await transaction.filter(el => {
-      return el.mode == "Buy" && el.status == "Matched";
-    });
-
-    if (matchStockBuys.length > 0) {
-      await automationSells(page, matchStockBuys, user_id, spreadPerLevel);
-    }
-
-    // AUTOMATION BUY
-    let matchStockSells = await transaction.filter(el => {
-      return el.mode == "Sell" && el.status == "Matched";
-    });
-
-    if (matchStockSells.length > 0) {
-      await automationBuys(page, matchStockSells, user_id, spreadPerLevel);
-    }
-
     // SELL BY TIME (ON)
     if (is_sell_by_time == "true") {
       if (now > sell_time) {
+        let nowSellTime = await getSellTimeData(user_id);
+
+        if (nowSellTime.length < 1) {
+          let exec = [];
+          exec[0] = await sellByTimeOnTrigger(
+            page,
+            user_id,
+            openStockSell,
+            openStock
+          );
+          exec[1] = await page.waitFor(5000);
+          exec[0] = await setHasSellByTimeTrigger(user_id);
+
+          Promise.all(exec).then(() => {
+            console.log("sellByTimeTrigger finish!!!");
+          });
+        }
+      }
+
+      if (now > closeTime) {
         job.stop();
 
         let message = "Robot has done.";
         let exec = [];
 
-        exec[0] = await sellByTimeOnTrigger(page, user_id);
+        // exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
+        // exec[3] = await page.waitFor(5000);
+        exec[0] = await setTransactionData(page, user_id, spreadPerLevel);
         exec[1] = await page.waitFor(5000);
-        exec[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
-        exec[3] = await page.waitFor(5000);
-        exec[4] = await setTransactionData(page, user_id);
-        exec[5] = await page.waitFor(5000);
-        exec[6] = await setOffRobotStatus(robot_id, message);
-        exec[7] = await page.waitFor(5000);
-        exec[8] = await browser.close();
+        exec[3] = await setOffRobotStatus(robot_id, message);
+        exec[4] = await page.waitFor(5000);
+        exec[5] = await browser.close();
 
         Promise.all(exec).then(() => {
           console.log(
-            "sellByTimeTrigger getUpdateSettingData setTransactionData setOffRobotStatus finish!!!"
+            "getUpdateSettingData setTransactionData setOffRobotStatus finish!!!"
           );
         });
       }
@@ -315,7 +331,8 @@ async function automation(
         URL_protofolio,
         user_id,
         clValue,
-        profitPerLevel
+        profitPerLevel,
+        openStock
       );
 
       // TURN OFF ROBOT
@@ -327,11 +344,11 @@ async function automation(
 
         exec[0] = await setInitBuySell(page, user_id);
         exec[1] = await page.waitFor(5000);
-        exec[4] = await setTransactionData(page, user_id);
+        exec[2] = await setTransactionData(page, user_id, spreadPerLevel);
+        exec[3] = await page.waitFor(5000);
+        exec[4] = await setOffRobotStatus(robot_id, message);
         exec[5] = await page.waitFor(5000);
-        exec[6] = await setOffRobotStatus(robot_id, message);
-        exec[7] = await page.waitFor(5000);
-        exec[8] = await browser.close();
+        exec[6] = await browser.close();
 
         Promise.all(exec).then(() => {
           console.log(
@@ -433,27 +450,15 @@ async function automationInitBuysSellTimeFalse(
 }
 
 // automation sells
-async function automationSells(page, matchStockBuys, user_id, spreadPerLevel) {
-  let dataStockSell = await matchStockBuys.map(async el => {
-    let spread = await getSpread(parseInt(el.price), spreadPerLevel);
-    return {
-      order_id: el.order_id,
-      user_id: user_id,
-      stock: el.stock,
-      mode: el.mode,
-      lots: el.lots,
-      status: el.status,
-      priceBuy: el.price,
-      priceSell: (parseInt(el.price) + spread).toString(),
-      createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-    };
-  });
+async function automationSells(page, matchStockBuys) {
+  let dataStockSell = matchStockBuys;
+
+  console.log("dataStockSell", dataStockSell);
 
   // set data stock sell
   let dataDB = [];
 
-  dataDB[0] = setStockSell(await dataStockSell);
+  dataDB[0] = setStockSell(dataStockSell);
   dataDB[1] = await page.waitFor(2000);
   dataDB[2] = getStockSell();
   dataDB[3] = console.log("dataDB", await dataDB[2]);
@@ -477,27 +482,15 @@ async function automationSells(page, matchStockBuys, user_id, spreadPerLevel) {
 }
 
 // automation buys
-async function automationBuys(page, matchStockSells, user_id, spreadPerLevel) {
-  let dataStockBuy = await matchStockSells.map(async el => {
-    let spread = await getSpread(parseInt(el.price), spreadPerLevel);
-    return {
-      order_id: el.order_id,
-      user_id: user_id,
-      stock: el.stock,
-      mode: el.mode,
-      lots: el.lots,
-      status: el.status,
-      priceBuy: (parseInt(el.price) - spread).toString(),
-      priceSell: el.price,
-      createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-    };
-  });
+async function automationBuys(page, matchStockSells) {
+  let dataStockBuy = matchStockSells;
+
+  console.log("dataStockBuy", dataStockBuy);
 
   // set data stock buy
   let dataDB = [];
 
-  dataDB[0] = setStockBuy(await dataStockBuy);
+  dataDB[0] = setStockBuy(dataStockBuy);
   dataDB[1] = await page.waitFor(2000);
   dataDB[2] = getStockBuy();
   dataDB[3] = console.log("dataDB", await dataDB[2]);
@@ -520,26 +513,13 @@ async function automationBuys(page, matchStockSells, user_id, spreadPerLevel) {
   });
 }
 
-// automation sells
+// automation sells by time on
 async function automationSellByTimes(page, openStockSells, user_id) {
-  let dataStockSellByTime = await openStockSells.map(el => {
-    return {
-      order_id: el.order_id,
-      user_id: user_id,
-      stock: el.stock,
-      mode: el.mode,
-      lots: el.lots,
-      status: el.status,
-      priceBuy: el.price,
-      priceSell: (parseInt(el.price) + 1).toString(),
-      createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-    };
-  });
+  let dataStockSellByTime = openStockSells;
 
   let dataDB = [];
 
-  dataDB[0] = setStockSell(await dataStockSellByTime);
+  dataDB[0] = setStockSell(dataStockSellByTime);
   dataDB[1] = await page.waitFor(2000);
   dataDB[2] = getStockSellByTime();
   dataDB[3] = console.log("dataDB", await dataDB[2]);
@@ -553,6 +533,37 @@ async function automationSellByTimes(page, openStockSells, user_id) {
   let stocksSellByTime = [];
   for (let i = 0; i < (await dataSellStock.length); i++) {
     stocksSellByTime.push(await stockSellByTime(page, await dataSellStock[i]));
+    await updateStockTransaction(await dataSellStock[i]);
+  }
+
+  // run sell stock
+  Promise.all(stocksSellByTime).then(() => {
+    console.log("stocksSellByTime finish!!!");
+  });
+}
+
+// automation sells by time off
+async function automationSellByTimesOff(page, openStockSells, user_id) {
+  let dataStockSellByTime = openStockSells;
+
+  let dataDB = [];
+
+  dataDB[0] = setStockSell(dataStockSellByTime);
+  dataDB[1] = await page.waitFor(2000);
+  dataDB[2] = getStockSellByTime();
+  dataDB[3] = console.log("dataDB", await dataDB[2]);
+  dataDB[4] = await page.waitFor(2000);
+
+  Promise.all(dataDB).then(() => {
+    console.log("setStockSell getStockSellByTime finish!!!");
+  });
+
+  let dataSellStock = await dataDB[2];
+  let stocksSellByTime = [];
+  for (let i = 0; i < (await dataSellStock.length); i++) {
+    stocksSellByTime.push(
+      await stockSellByTimeOff(page, await dataSellStock[i])
+    );
     await updateStockTransaction(await dataSellStock[i]);
   }
 
@@ -634,18 +645,9 @@ async function automationSetWithdrawRhb(
 }
 
 // sell by time on trigger
-async function sellByTimeOnTrigger(page, user_id) {
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
-
-  let openStockSells = await transaction.filter(el => {
-    return el.mode == "Sell" && el.status == "Open";
-  });
-
-  // get open stock
-  let stockOpen = await transaction.filter(el => {
-    return el.status == "Open";
-  });
+async function sellByTimeOnTrigger(page, user_id, openStockSell, openStock) {
+  let openStockSells = await openStockSell;
+  let stockOpen = await openStock;
 
   if (stockOpen.length > 0) {
     // set index into every element
@@ -672,7 +674,8 @@ async function sellByTimeOffTrigger(
   URL_protofolio,
   user_id,
   clValue,
-  profitPerLevel
+  profitPerLevel,
+  openStock
 ) {
   let data = await automationPortofolio(page, URL_protofolio, user_id);
   await page.waitFor(1000);
@@ -682,14 +685,8 @@ async function sellByTimeOffTrigger(
     last: el.last
   }));
 
-  // TRANSACTION
-  let transaction = await getTransaction(page);
-  await page.waitFor(1000);
-
   // get open stock
-  let stockOpen = transaction.filter(el => {
-    return el.status == "Open";
-  });
+  let stockOpen = await openStock;
 
   if (stockOpen.length > 0) {
     let mapStockOpen = stockOpen.map((el, i) => ({
@@ -707,10 +704,10 @@ async function sellByTimeOffTrigger(
     });
 
     // get tp or cl
-    let tpclStock = await getTpClStock(mapStockOpen);
+    let tpclStock = await getTpClStock(mapStockOpen, user_id);
 
     if (tpclStock.length > 0) {
-      let tpclStockSell = await tpclStock.filter(el => {
+      let tpclStockSell = tpclStock.filter(el => {
         return el.mode == "Sell";
       });
 
@@ -719,7 +716,7 @@ async function sellByTimeOffTrigger(
 
         await page.waitFor(2000);
 
-        await automationSellByTimes(page, tpclStockSell, user_id);
+        await automationSellByTimesOff(page, tpclStockSell, user_id);
       }
     }
   }
@@ -862,7 +859,7 @@ async function stockSell(page, dataStockSell) {
   return await page.waitFor(1000);
 }
 
-// set sell by time stocks
+// set sell stocks by time on
 async function stockSellByTime(page, dataStockSell) {
   const URL_orderpad_sell =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
@@ -892,7 +889,38 @@ async function stockSellByTime(page, dataStockSell) {
   }
 
   console.log("finish");
-  console.log("#############################################S");
+  console.log("##############################################");
+
+  return await page.waitFor(1000);
+}
+
+// set sell stocks by time off
+async function stockSellByTimeOff(page, dataStockSell) {
+  const URL_orderpad_sell =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
+  let stock = dataStockSell.stock;
+  let lots = dataStockSell.lots;
+
+  let priceSell = dataStockSell.priceSell;
+
+  console.log("stock ", stock);
+
+  await page.goto(URL_orderpad_sell);
+
+  await page.type("input[id='_stockCode']", stock);
+  await page.keyboard.press(String.fromCharCode(13));
+  await page.waitFor(3000);
+
+  await page.type("input[id='_volume']", lots);
+  await page.type("input[id='_price']", priceSell);
+  await page.click("button[id='_enter']");
+  await page.waitFor(1000);
+  await page.click("button[id='_confirm']");
+  await page.waitFor(1000);
+  console.log("=-=-=-=-=SELL BY TIME=-=-=-=-=", priceSell);
+
+  console.log("finish");
+  console.log("##############################################");
 
   return await page.waitFor(1000);
 }
@@ -1147,6 +1175,8 @@ async function getUsers(robot_id) {
 async function setStockSell(stockData) {
   let err, stockSell;
 
+  console.log("stockData", stockData);
+
   stockData.forEach(async el => {
     [err, stockSell] = await to(
       Stock_Sell.findOne({ where: { order_id: el.order_id } })
@@ -1167,6 +1197,8 @@ async function setStockSell(stockData) {
 async function getStockSell() {
   let err, stockSell;
 
+  let trxNow = moment().format("YYYY-MM-DD");
+
   [err, stockSell] = await to(
     Stock_Sell.findAll({
       where: {
@@ -1177,7 +1209,14 @@ async function getStockSell() {
     })
   );
 
-  return stockSell;
+  let data = [];
+
+  data = stockSell.filter(el => {
+    let stockDate = moment(el.createdAt).format("YYYY-MM-DD");
+    return stockDate == trxNow;
+  });
+
+  return data;
 }
 
 // get stock buy
@@ -1219,6 +1258,8 @@ async function setStockBuy(stockData) {
 async function getStockBuy() {
   let err, stockBuy;
 
+  let trxNow = moment().format("YYYY-MM-DD");
+
   [err, stockBuy] = await to(
     Stock_Sell.findAll({
       where: {
@@ -1229,7 +1270,14 @@ async function getStockBuy() {
     })
   );
 
-  return stockBuy;
+  let data = [];
+
+  data = stockBuy.filter(el => {
+    let stockDate = moment(el.createdAt).format("YYYY-MM-DD");
+    return stockDate == trxNow;
+  });
+
+  return data;
 }
 
 // set withdraw stock sell
@@ -1557,6 +1605,41 @@ async function setOffRobotStatus(robot_id, message) {
   [err, robot] = await to(robot.save());
 }
 
+// set data sell time
+async function setSellTimeData(user_id) {
+  let err, sellTime;
+  let trxNow = moment().format("YYYY-MM-DD");
+
+  let data = {
+    user_id: user_id,
+    on_sell_by_time: "yes"
+  };
+
+  [err, sellTime] = await to(Sell_Times.create(data));
+}
+
+// get data sell time transaction now
+async function getSellTimeData(user_id) {
+  let err, sellTime;
+  let trxNow = moment().format("YYYY-MM-DD");
+
+  [err, sellTime] = await to(
+    Sell_Times.findAll({ where: { user_id: user_id } })
+  );
+
+  let nowSellTime = sellTime.filter(el => {
+    let createdAt = moment(el.createdAt).format("YYYY-MM-DD");
+
+    return trxNow == createdAt;
+  });
+
+  if (nowSellTime.length == 0) {
+    await setSellTimeData(user_id);
+  }
+
+  return nowSellTime;
+}
+
 // exec withdraw
 async function withdraws(page, URL_accountinfo, robot_id, user_id) {
   let exec = [];
@@ -1580,11 +1663,6 @@ async function withdraws(page, URL_accountinfo, robot_id, user_id) {
 
 // get withdraw data
 async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
-  // let lastInitBuy = [];
-  // let lastOrder = moment()
-  //   .subtract(1, "days")
-  //   .format("YYYY-MM-DD");
-
   let now = moment()
     .subtract(1, "months")
     .format("MM/01/YYYY");
@@ -1829,19 +1907,26 @@ async function setProtofolioData(page, getPortofolio, user_id) {
     [err, portofolio_stock] = await to(
       Portofolio_stocks.findOne({ where: { user_id: user_id } })
     );
-    // if (portofolio_stock) return ReE(res, err, 422);
 
-    // console.log(stock.dataValues.id)
     el.portofolio_id = lastinsertId;
     el.user_id = user_id;
     // console.log(portofolio_stock)
     if (!portofolio_stock) {
       [err, portofolio_stock] = await to(Portofolio_stocks.create(el));
-      // if (portofolio_stock) return ReE(res, err, 422);
     } else {
-      portofolio_stock.set(el);
-      [err, portofolio_stock] = await to(portofolio_stock.save());
-      // if (err) return ReE(res, err, 422);
+      Promise.all([
+        ([err, portofolio_stock] = await to(
+          Portofolio_stocks.findAll({ where: { user_id: user_id } })
+        )),
+        portofolio_stock.forEach(async element => {
+          if (element) {
+            ([err, portofolio_stock] = await to(
+              Portofolio_stocks.findOne({ where: { id: element.id } })
+            )),
+              ([err, portofolio_stock] = await to(element.destroy()));
+          }
+        })
+      ])[(err, portofolio_stock)] = await to(Portofolio_stocks.create(el));
     }
   });
 }
@@ -1864,8 +1949,51 @@ async function automationPortofolio(page, URL_protofolio, user_id) {
 }
 
 // get data if last more than tp or last less than cl
-async function getTpClStock(matchStockSells) {
-  return matchStockSells.filter(el => el.tp >= el.last || el.cl <= el.last);
+async function getTpClStock(mapStockOpen, user_id) {
+  let dataMapStockOpen = [];
+
+  mapStockOpen.forEach((el, i) => {
+    // target profit >= last
+    if (el.tp >= el.last) {
+      dataMapStockOpen.push({
+        order_id: el.order_id,
+        user_id: user_id,
+        stock: el.stock,
+        mode: el.mode,
+        lots: el.lots,
+        status: el.status,
+        priceBuy: el.price,
+        priceSell: el.tp.toString(),
+        tp: el.tp,
+        cl: el.cl,
+        last: el.last,
+        index: el.index,
+        createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+      });
+    }
+
+    // cut lost <= last
+    if (el.cl <= el.last) {
+      dataMapStockOpen.push({
+        order_id: el.order_id,
+        user_id: user_id,
+        stock: el.stock,
+        mode: el.mode,
+        lots: el.lots,
+        status: el.status,
+        priceBuy: el.price,
+        priceSell: el.cl.toString(),
+        tp: el.tp,
+        cl: el.cl,
+        last: el.last,
+        index: el.index,
+        createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+      });
+    }
+  });
+  return dataMapStockOpen;
 }
 
 // get last init sell
@@ -1891,7 +2019,7 @@ async function getLastInitBuysSells(user_id) {
 }
 
 // set transaction
-async function setTransactionData(page, user_id) {
+async function setTransactionData(page, user_id, spreadPerLevel) {
   let getDataTransaction = await getTransaction(page);
 
   await page.waitFor(4000);
@@ -1912,6 +2040,72 @@ async function setTransactionData(page, user_id) {
       [err, transaction] = await to(transaction.save());
     }
   });
+
+  let dataStock = {};
+  let dataStockBuy = [];
+  let dataStockSell = [];
+  let openStockBuy = [];
+  let openStockSell = [];
+  let matchStockBuy = [];
+  let matchStockSell = [];
+
+  let openStock = [];
+
+  getDataTransaction.forEach(async (el, i) => {
+    let spl = parseInt(spreadPerLevel);
+    let spread = 0;
+
+    spread = Math.round(el.price * (spl / 100));
+
+    if (el.status == "Open") {
+      openStock.push(el);
+    }
+
+    if (el.mode == "Buy") {
+      dataStockSell.push({
+        order_id: el.order_id,
+        user_id: user_id,
+        stock: el.stock,
+        mode: el.mode,
+        lots: el.lots,
+        status: el.status,
+        priceBuy: el.price,
+        priceSell: (parseInt(el.price) + spread).toString(),
+        createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+      });
+    } else if (el.mode == "Sell") {
+      dataStockBuy.push({
+        order_id: el.order_id,
+        user_id: user_id,
+        stock: el.stock,
+        mode: el.mode,
+        lots: el.lots,
+        status: el.status,
+        priceBuy: (parseInt(el.price) - spread).toString(),
+        priceSell: el.price,
+        createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+      });
+    }
+  });
+
+  matchStockSell = dataStockSell.filter(el => el.status == "Matched");
+  openStockSell = dataStockSell.filter(el => el.status == "Open");
+  matchStockBuy = dataStockBuy.filter(el => el.status == "Matched");
+  openStockBuy = dataStockBuy.filter(el => el.status == "Open");
+
+  dataStock = {
+    dataStockSell,
+    dataStockBuy,
+    matchStockSell,
+    matchStockBuy,
+    openStockSell,
+    openStockBuy,
+    openStock
+  };
+
+  return dataStock;
 }
 
 // set last init sell by time off
@@ -1947,7 +2141,6 @@ async function closeErrorRobot(page, msg, robot_id) {
   let exec = [];
 
   exec[0] = await setOffRobotStatus(robot_id, message);
-  exec[1] = await page.waitFor(1500);
   exec[2] = await browser.close();
 
   Promise.all(exec).then(() => {
