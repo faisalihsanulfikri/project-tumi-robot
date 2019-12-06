@@ -157,7 +157,7 @@ module.exports.run = async function(req, res) {
     });
   } catch (error) {
     let msg = "Gagal terhubung dengan RHB";
-    await closeErrorRobot(page, msg, robot_id);
+    await closeErrorRobot(msg, robot_id);
   }
 };
 
@@ -1441,7 +1441,7 @@ async function login(page, username, password, robot_id) {
     await page.click("button[type=submit]");
   } catch (error) {
     let msg = "Gagal bypass captcha";
-    await closeErrorRobot(page, msg, robot_id);
+    await closeErrorRobot(msg, robot_id);
   }
 }
 
@@ -1454,7 +1454,7 @@ async function loginTrading(page, URL_runningTrade, pin) {
     await page.click("input[id='_ltEnter']");
   } catch (error) {
     let msg = "Gagal login pin trading";
-    await closeErrorRobot(page, msg, robot_id);
+    await closeErrorRobot(msg, robot_id);
   }
 }
 
@@ -2136,7 +2136,7 @@ async function setInitBuySell(page, user_id) {
 }
 
 // close error robot
-async function closeErrorRobot(page, msg, robot_id) {
+async function closeErrorRobot(msg, robot_id) {
   let message = msg;
   let exec = [];
 
