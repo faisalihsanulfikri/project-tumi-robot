@@ -69,8 +69,28 @@ module.exports.run = async function(req, res) {
      * OPEN RHB PAGE
      */
     const page = await browser.newPage();
+    // page transaction
+    const pageTrx = await browser.newPage();
+    // page portfolio
+    const pagePF = await browser.newPage();
+    // page stock ranking
+    const pageSR = await browser.newPage();
+    // page withdraws
+    const pageWd = await browser.newPage();
 
     page.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageTrx.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pagePF.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageSR.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageWd.on("dialog", async dialog => {
       await dialog.accept();
     });
 
@@ -90,7 +110,7 @@ module.exports.run = async function(req, res) {
 
     // GET SETTING DATA IF SELL BY TIME IS TRUE
     if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
-      settings = await getUpdateSettingData(page, URL_protofolio, thisUser);
+      settings = await getUpdateSettingData(pagePF, URL_protofolio, thisUser);
     }
 
     let price_type = await settings.price_type;
@@ -122,6 +142,10 @@ module.exports.run = async function(req, res) {
         await main(
           res,
           page,
+          pageTrx,
+          pagePF,
+          pageSR,
+          pageWd,
           browser,
           user_id,
           settings,
@@ -162,6 +186,10 @@ module.exports.run = async function(req, res) {
 async function main(
   res,
   page,
+  pageTrx,
+  pagePF,
+  pageSR,
+  pageWd,
   browser,
   user_id,
   settings,
@@ -209,6 +237,10 @@ async function main(
   mainExec[2] = await automation(
     res,
     page,
+    pageTrx,
+    pagePF,
+    pageSR,
+    pageWd,
     browser,
     user_id,
     settings,
@@ -234,6 +266,10 @@ async function main(
 async function automation(
   res,
   page,
+  pageTrx,
+  pagePF,
+  pageSR,
+  pageWd,
   browser,
   user_id,
   settings,
@@ -245,25 +281,25 @@ async function automation(
   profitPerLevel,
   spreadPerLevel
 ) {
-  const job = new CronJob("*/120 * * * * *", async function() {
+  const job = new CronJob("*/90 * * * * *", async function() {
     // INNITIATION
     settings = await getSettingData(user_id);
     let now = moment().format("HH:mm:ss");
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTime = moment(settings.cl_time, "HH:mm:ss");
     let sell_time = moment(getSellTime).format("HH:mm:ss");
-    let getCloseTime = moment("16:15:00", "HH:mm:ss");
+    let getCloseTime = moment("16:00:00", "HH:mm:ss");
     let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
     // SET / UPDATE DATA TO TUMI DATABASE
     let transaction = await setTransactionData(
-      page,
+      pageTrx,
       user_id,
       spreadPerLevel,
       robot_id
     );
     await page.waitFor(5000);
-    await automationPortofolio(page, URL_protofolio, user_id, robot_id);
+    await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
     await page.waitFor(5000);
 
     let matchStockBuy = transaction.matchStockBuy;
@@ -306,7 +342,7 @@ async function automation(
         // execSellTimeFalse[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
         // execSellTimeFalse[3] = await page.waitFor(5000);
         execSellTimeFalse[0] = await setTransactionData(
-          page,
+          pageTrx,
           user_id,
           spreadPerLevel,
           robot_id
@@ -328,6 +364,7 @@ async function automation(
       // SELL BY TIME (OFF)
       await sellByTimeOffTrigger(
         page,
+        pagePF,
         URL_protofolio,
         user_id,
         clValue,
@@ -346,7 +383,7 @@ async function automation(
         exec[0] = await setInitBuySell(page, user_id);
         exec[1] = await page.waitFor(5000);
         exec[2] = await setTransactionData(
-          page,
+          pageTrx,
           user_id,
           spreadPerLevel,
           robot_id
@@ -376,10 +413,8 @@ async function automation(
       await automationBuys(page, matchStockBuy, robot_id, user_id);
     }
 
-    await withdraws(page, URL_accountinfo, robot_id, user_id);
-    await page.waitFor(5000);
-    await inputStockRangking(page);
-    await page.waitFor(5000);
+    await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
+    await inputStockRangking(pageSR);
 
     console.log("Robot " + robot_id + " : globalIndex = ", globalIndex);
     globalIndex++;
@@ -671,7 +706,7 @@ async function automationWithdrawStockSellOff(page, withdrawData, robot_id) {
 
 // set automation withdraw rhb
 async function automationSetWithdrawRhb(
-  page,
+  pageWd,
   URL_accountinfo,
   robot_id,
   user_id
@@ -683,7 +718,7 @@ async function automationSetWithdrawRhb(
     "Robot " + robot_id + " : getWithdrawData",
     await dataDB[0]
   );
-  dataDB[2] = await page.waitFor(2000);
+  dataDB[2] = await pageWd.waitFor(2000);
 
   Promise.all(dataDB).then(() => {
     console.log("Robot " + robot_id + " : getWithdrawData finish!!!");
@@ -700,7 +735,7 @@ async function automationSetWithdrawRhb(
     let execWithdraw = [];
     for (let i = 0; i < (await requrstWithdraw.length); i++) {
       execWithdraw.push(
-        await setWithdrawRhb(page, URL_accountinfo, await requrstWithdraw[i])
+        await setWithdrawRhb(pageWd, URL_accountinfo, await requrstWithdraw[i])
       );
       await updateWithdrawData(await requrstWithdraw[i]);
     }
@@ -745,6 +780,7 @@ async function sellByTimeOnTrigger(
 // sell by time off trigger
 async function sellByTimeOffTrigger(
   page,
+  pagePF,
   URL_protofolio,
   user_id,
   clValue,
@@ -753,12 +789,12 @@ async function sellByTimeOffTrigger(
   robot_id
 ) {
   let data = await automationPortofolio(
-    page,
+    pagePF,
     URL_protofolio,
     user_id,
     robot_id
   );
-  await page.waitFor(1000);
+  await pagePF.waitFor(1000);
 
   let filterStockProtofolio = await data.table.map(el => ({
     stock: el.stock,
@@ -1197,12 +1233,12 @@ async function stockRanking(page) {
 }
 
 // input stock rangking
-async function inputStockRangking(page) {
+async function inputStockRangking(pageSR) {
   let stock_rangking, getStockrangking, stock, stock_rangkings, err;
 
-  getStockrangking = await stockRanking(page);
+  getStockrangking = await stockRanking(pageSR);
 
-  await page.waitFor(1000);
+  await pageSR.waitFor(1000);
 
   Promise.all([
     ([err, stock_rangkings] = await to(Stock_rangking.findAll({ raw: true }))),
@@ -1571,14 +1607,14 @@ async function loginTrading(browser, page, URL_runningTrade, pin) {
 }
 
 // get update setting data
-async function getUpdateSettingData(page, URL_protofolio, thisUser) {
-  await page.goto(URL_protofolio);
-  await page.waitFor(1000);
+async function getUpdateSettingData(pagePF, URL_protofolio, thisUser) {
+  await pagePF.goto(URL_protofolio);
+  await pagePF.waitFor(1000);
 
   let user_id = thisUser.user_id;
   let setting = thisUser.setting;
 
-  let cost_total = await page.evaluate(
+  let cost_total = await pagePF.evaluate(
     () => document.querySelector("div[id='_newOutstandingBalance']").innerHTML
   );
 
@@ -1747,13 +1783,13 @@ async function getSellTimeData(user_id) {
 }
 
 // exec withdraw
-async function withdraws(page, URL_accountinfo, robot_id, user_id) {
+async function withdraws(pageWd, URL_accountinfo, robot_id, user_id) {
   let exec = [];
 
-  exec[0] = await setWithdrawData(page, URL_accountinfo, robot_id, user_id);
-  exec[1] = await page.waitFor(3000);
+  exec[0] = await setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id);
+  exec[1] = await pageWd.waitFor(3000);
   exec[2] = await automationSetWithdrawRhb(
-    page,
+    pageWd,
     URL_accountinfo,
     robot_id,
     user_id
@@ -1857,15 +1893,15 @@ async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
 }
 
 // set withdraw data
-async function setWithdrawData(page, URL_accountinfo, robot_id, user_id) {
-  let dataGetWistdraw = await getWithdrawRhb(page, URL_accountinfo, robot_id);
+async function setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id) {
+  let dataGetWistdraw = await getWithdrawRhb(pageWd, URL_accountinfo, robot_id);
 
-  await page.waitFor(3000);
+  await pageWd.waitFor(3000);
 
   if (dataGetWistdraw.length > 0) {
     let dataWithdraw = await setObjectDataWithdraw(dataGetWistdraw, user_id);
 
-    await page.waitFor(3000);
+    await pageWd.waitFor(3000);
     let uWithdraw, err;
 
     dataWithdraw.forEach(async el => {
@@ -1912,36 +1948,36 @@ async function updateWithdrawData(requrstWithdraw) {
 }
 
 // get portofolio rhb
-async function getPortofolioRhb(page, URL_protofolio) {
-  await page.goto(URL_protofolio);
-  await page.waitFor(2000);
+async function getPortofolioRhb(pagePF, URL_protofolio) {
+  await pagePF.goto(URL_protofolio);
+  await pagePF.waitFor(2000);
 
   const headData = {};
 
-  let startingBalance = await page.evaluate(
+  let startingBalance = await pagePF.evaluate(
     () => document.querySelector("div[id='_startingBalance']").innerHTML
   );
-  await page.waitFor(1000);
+  await pagePF.waitFor(1000);
 
-  let availableLimit = await page.evaluate(
+  let availableLimit = await pagePF.evaluate(
     () => document.querySelector("div[id='_availableLimit']").innerHTML
   );
-  await page.waitFor(1000);
+  await pagePF.waitFor(1000);
 
-  let fundingAvailable = await page.evaluate(
+  let fundingAvailable = await pagePF.evaluate(
     () => document.querySelector("div[id='_fundingAvailable']").innerHTML
   );
-  await page.waitFor(1000);
+  await pagePF.waitFor(1000);
 
-  let totalAsset = await page.evaluate(
+  let totalAsset = await pagePF.evaluate(
     () => document.querySelector("div[id='_totalAsset']").innerHTML
   );
-  await page.waitFor(1000);
+  await pagePF.waitFor(1000);
 
-  let cashRdn = await page.evaluate(
+  let cashRdn = await pagePF.evaluate(
     () => document.querySelector("div[id='_cashRdn']").innerHTML
   );
-  await page.waitFor(1000);
+  await pagePF.waitFor(1000);
   const item = [];
 
   (headData["starting_balance"] = await startingBalance.replace(/,\s*/g, "")),
@@ -1954,8 +1990,8 @@ async function getPortofolioRhb(page, URL_protofolio) {
     (headData["cash_in_rdn"] = await cashRdn.replace(/,\s*/g, "")),
     item.push(headData);
 
-  await page.waitFor(1000);
-  const table = await page.evaluate(() => {
+  await pagePF.waitFor(1000);
+  const table = await pagePF.evaluate(() => {
     return new Promise((resolve, reject) => {
       let table = document.querySelector("#_portfolio");
       let row = table.children;
@@ -1987,7 +2023,7 @@ async function getPortofolioRhb(page, URL_protofolio) {
 }
 
 // set protofolio data
-async function setProtofolioData(page, getPortofolio, user_id) {
+async function setProtofolioData(pagePF, getPortofolio, user_id) {
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
@@ -2006,7 +2042,7 @@ async function setProtofolioData(page, getPortofolio, user_id) {
     }
   });
 
-  await page.waitFor(2000);
+  await pagePF.waitFor(2000);
 
   getPortofolio.table.forEach(async el => {
     [err, portofolio_stock] = await to(
@@ -2037,17 +2073,17 @@ async function setProtofolioData(page, getPortofolio, user_id) {
 }
 
 // automation protofolio
-async function automationPortofolio(page, URL_protofolio, user_id, robot_id) {
+async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
   let exec = [];
 
-  exec[0] = await getPortofolioRhb(page, URL_protofolio);
-  exec[1] = await page.waitFor(1000);
+  exec[0] = await getPortofolioRhb(pagePF, URL_protofolio);
+  exec[1] = await pagePF.waitFor(1000);
   exec[2] = await console.log(
     "Robot " + robot_id + " : portofolio",
     await exec[0]
   );
-  exec[3] = await page.waitFor(1000);
-  exec[4] = await setProtofolioData(page, exec[0], user_id);
+  exec[3] = await pagePF.waitFor(1000);
+  exec[4] = await setProtofolioData(pagePF, exec[0], user_id);
 
   Promise.all(exec).then(() => {
     console.log(
@@ -2129,10 +2165,10 @@ async function getLastInitBuysSells(user_id) {
 }
 
 // set transaction
-async function setTransactionData(page, user_id, spreadPerLevel, robot_id) {
-  let getDataTransaction = await getTransaction(page);
+async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
+  let getDataTransaction = await getTransaction(pageTrx);
 
-  await page.waitFor(4000);
+  await pageTrx.waitFor(4000);
 
   let err, transaction;
 
