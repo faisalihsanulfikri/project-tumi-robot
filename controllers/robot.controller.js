@@ -207,30 +207,30 @@ async function main(
 ) {
   let mainExec = [];
 
-  // if (settings.is_sell_by_time == "true") {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-  //   mainExec[0] = await automationInitBuys(
-  //     page,
-  //     price_type,
-  //     level_per_stock,
-  //     stock_value_data,
-  //     dana_per_stock,
-  //     spreadPerLevel,
-  //     robot_id
-  //   );
-  // } else {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-  //   mainExec[0] = await automationInitBuysSellTimeFalse(
-  //     page,
-  //     price_type,
-  //     level_per_stock,
-  //     stock_value_data,
-  //     dana_per_stock,
-  //     spreadPerLevel,
-  //     user_id,
-  //     robot_id
-  //   );
-  // }
+  if (settings.is_sell_by_time == "true") {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+    mainExec[0] = await automationInitBuys(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel,
+      robot_id
+    );
+  } else {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+    mainExec[0] = await automationInitBuysSellTimeFalse(
+      page,
+      price_type,
+      level_per_stock,
+      stock_value_data,
+      dana_per_stock,
+      spreadPerLevel,
+      user_id,
+      robot_id
+    );
+  }
 
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
