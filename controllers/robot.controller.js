@@ -207,30 +207,30 @@ async function main(
 ) {
   let mainExec = [];
 
-  if (settings.is_sell_by_time == "true") {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-    mainExec[0] = await automationInitBuys(
-      page,
-      price_type,
-      level_per_stock,
-      stock_value_data,
-      dana_per_stock,
-      spreadPerLevel,
-      robot_id
-    );
-  } else {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-    mainExec[0] = await automationInitBuysSellTimeFalse(
-      page,
-      price_type,
-      level_per_stock,
-      stock_value_data,
-      dana_per_stock,
-      spreadPerLevel,
-      user_id,
-      robot_id
-    );
-  }
+  // if (settings.is_sell_by_time == "true") {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+  //   mainExec[0] = await automationInitBuys(
+  //     page,
+  //     price_type,
+  //     level_per_stock,
+  //     stock_value_data,
+  //     dana_per_stock,
+  //     spreadPerLevel,
+  //     robot_id
+  //   );
+  // } else {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+  //   mainExec[0] = await automationInitBuysSellTimeFalse(
+  //     page,
+  //     price_type,
+  //     level_per_stock,
+  //     stock_value_data,
+  //     dana_per_stock,
+  //     spreadPerLevel,
+  //     user_id,
+  //     robot_id
+  //   );
+  // }
 
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
@@ -288,7 +288,7 @@ async function automation(
     let is_sell_by_time = settings.is_sell_by_time;
     let getSellTime = moment(settings.cl_time, "HH:mm:ss");
     let sell_time = moment(getSellTime).format("HH:mm:ss");
-    let getCloseTime = moment("16:00:00", "HH:mm:ss");
+    let getCloseTime = moment("16:15:00", "HH:mm:ss");
     let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
     // SET / UPDATE DATA TO TUMI DATABASE
