@@ -277,6 +277,40 @@ async function automation(
   profitPerLevel,
   spreadPerLevel
 ) {
+  // secondary job
+  const jobSecondary = new CronJob("*/120 * * * * *", async function() {
+    // INNITIATION
+    settings = await getSettingData(user_id);
+    let now = moment().format("HH:mm:ss");
+    let is_sell_by_time = settings.is_sell_by_time;
+    let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+    let sell_time = moment(getSellTime).format("HH:mm:ss");
+    let getCloseTime = moment("16:15:00", "HH:mm:ss");
+    let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+    await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
+    await page.waitFor(5000);
+
+    // SELL BY TIME (ON)
+    if (is_sell_by_time == "true") {
+      if (now >= sell_time) {
+        jobSecondary.stop();
+      }
+    } else {
+      // SELL BY TIME (OFF)
+      // TURN OFF ROBOT
+      if (now >= closeTime) {
+        jobSecondary.stop();
+      }
+    }
+
+    await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
+    await inputStockRangking(pageSR);
+
+    console.log("Robot " + robot_id + " : globalIndex = ", globalIndex);
+    globalIndex++;
+  });
+
   // main job
   const job = new CronJob("*/120 * * * * *", async function() {
     try {
@@ -405,43 +439,9 @@ async function automation(
       globalIndex++;
     } catch (error) {
       job.stop();
-      jobSecondary.start();
+      jobSecondary.stop();
       await closeErrorRobot(res, browser, thisMessage, robot_id);
     }
-  });
-
-  // secondary job
-  const jobSecondary = new CronJob("*/120 * * * * *", async function() {
-    // INNITIATION
-    settings = await getSettingData(user_id);
-    let now = moment().format("HH:mm:ss");
-    let is_sell_by_time = settings.is_sell_by_time;
-    let getSellTime = moment(settings.cl_time, "HH:mm:ss");
-    let sell_time = moment(getSellTime).format("HH:mm:ss");
-    let getCloseTime = moment("16:15:00", "HH:mm:ss");
-    let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-    await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
-    await page.waitFor(5000);
-
-    // SELL BY TIME (ON)
-    if (is_sell_by_time == "true") {
-      if (now >= sell_time) {
-        jobSecondary.stop();
-      }
-    } else {
-      // SELL BY TIME (OFF)
-      // TURN OFF ROBOT
-      if (now >= closeTime) {
-        jobSecondary.stop();
-      }
-    }
-
-    await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
-    await inputStockRangking(pageSR);
-
-    console.log("Robot " + robot_id + " : globalIndex = ", globalIndex);
-    globalIndex++;
   });
 
   job.start();
