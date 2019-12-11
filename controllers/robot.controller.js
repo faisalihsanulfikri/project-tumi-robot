@@ -23,6 +23,7 @@ const CronJob = require("cron").CronJob;
 require("dotenv").config();
 
 let globalIndex = 0;
+let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
 
 module.exports.run = async function(req, res) {
   let robot_id = req.params.robot_id;
@@ -98,11 +99,11 @@ module.exports.run = async function(req, res) {
     await page.waitFor(2000);
 
     // LOGIN RHB
-    await login(browser, page, username, password, robot_id);
+    await login(res, browser, page, username, password, robot_id);
     await setOnRobotStatus(robot_id);
 
     // LOGIN TRADING
-    await loginTrading(browser, page, URL_runningTrade, pin);
+    await loginTrading(res, browser, page, URL_runningTrade, pin);
 
     // GET SETTING DATA
     let settings = await getSettingData(user_id);
@@ -169,16 +170,11 @@ module.exports.run = async function(req, res) {
     /** END */
     return res.json({
       success: 1,
-      message: "Robot already run."
+      message: "Robot sudah berjalan."
     });
   } catch (error) {
     let msg = "Gagal terhubung dengan RHB";
-    await closeErrorRobot(browser, msg, robot_id);
-
-    return res.json({
-      success: 0,
-      message: "Robot failed to run."
-    });
+    await closeErrorRobot(res, browser, msg, robot_id);
   }
 };
 
@@ -281,41 +277,54 @@ async function automation(
   profitPerLevel,
   spreadPerLevel
 ) {
-  const job = new CronJob("*/90 * * * * *", async function() {
-    // INNITIATION
-    settings = await getSettingData(user_id);
-    let now = moment().format("HH:mm:ss");
-    let is_sell_by_time = settings.is_sell_by_time;
-    let getSellTime = moment(settings.cl_time, "HH:mm:ss");
-    let sell_time = moment(getSellTime).format("HH:mm:ss");
-    let getCloseTime = moment("16:15:00", "HH:mm:ss");
-    let closeTime = moment(getCloseTime).format("HH:mm:ss");
+  // main job
+  const job = new CronJob("*/120 * * * * *", async function() {
+    try {
+      // INNITIATION
+      settings = await getSettingData(user_id);
+      let now = moment().format("HH:mm:ss");
+      let is_sell_by_time = settings.is_sell_by_time;
+      let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+      let sell_time = moment(getSellTime).format("HH:mm:ss");
+      let getCloseTime = moment("16:15:00", "HH:mm:ss");
+      let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
-    // SET / UPDATE DATA TO TUMI DATABASE
-    let transaction = await setTransactionData(
-      pageTrx,
-      user_id,
-      spreadPerLevel,
-      robot_id
-    );
-    await page.waitFor(5000);
-    await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
-    await page.waitFor(5000);
+      // SET / UPDATE DATA TO TUMI DATABASE
+      let transaction = await setTransactionData(
+        pageTrx,
+        user_id,
+        spreadPerLevel,
+        robot_id
+      );
+      await page.waitFor(5000);
 
-    let matchStockBuy = transaction.matchStockBuy;
-    let matchStockSell = transaction.matchStockSell;
-    let openStockBuy = transaction.openStockBuy;
-    let openStockSell = transaction.openStockSell;
+      let matchStockBuy = transaction.matchStockBuy;
+      let matchStockSell = transaction.matchStockSell;
+      let openStockBuy = transaction.openStockBuy;
+      let openStockSell = transaction.openStockSell;
 
-    let openStock = transaction.openStock;
+      let openStock = transaction.openStock;
 
-    // SELL BY TIME (ON)
-    if (is_sell_by_time == "true") {
-      console.log("Robot " + robot_id + " : now = ", now);
-      console.log("Robot " + robot_id + " : sell time = ", sell_time);
-      if (now >= sell_time) {
-        let nowSellTime = await getSellTimeData(user_id);
-        if (nowSellTime.length < 1) {
+      // AUTOMATION SELL
+      if (matchStockSell.length > 0) {
+        await automationSells(page, matchStockBuy, robot_id, user_id);
+      }
+
+      // AUTOMATION BUY
+      if (matchStockBuy.length > 0) {
+        await automationBuys(page, matchStockSell, robot_id, user_id);
+      }
+
+      // SELL BY TIME (ON)
+      if (is_sell_by_time == "true") {
+        console.log("Robot " + robot_id + " : now = ", now);
+        console.log("Robot " + robot_id + " : sell time = ", sell_time);
+        console.log("Robot " + robot_id + " : openStockSell = ", openStockSell);
+        if (now >= sell_time) {
+          job.stop();
+          thisMessage =
+            "Robot telah selesai dengan sell time (sell by time yes)";
+
           let execSellTimeTrue = [];
           execSellTimeTrue[0] = await sellByTimeOnTrigger(
             page,
@@ -325,92 +334,107 @@ async function automation(
             robot_id
           );
           execSellTimeTrue[1] = await page.waitFor(5000);
+          execSellTimeTrue[2] = await setTransactionData(
+            pageTrx,
+            user_id,
+            spreadPerLevel,
+            robot_id
+          );
+          execSellTimeTrue[3] = await page.waitFor(5000);
+          execSellTimeTrue[4] = await setOffRobotStatus(robot_id, thisMessage);
+          execSellTimeTrue[5] = await page.waitFor(5000);
+          execSellTimeTrue[6] = await browser.close();
           Promise.all(execSellTimeTrue).then(() => {
-            console.log("Robot " + robot_id + " : sellByTimeTrigger finish!!!");
+            console.log(
+              "Robot " +
+                robot_id +
+                " : sellByTimeTrigger setTransactionData setOffRobotStatus finish!!!"
+            );
+          });
+        }
+      } else {
+        console.log("Robot " + robot_id + " : now = ", now);
+        console.log("Robot " + robot_id + " : closeTime = ", closeTime);
+        // SELL BY TIME (OFF)
+        await sellByTimeOffTrigger(
+          page,
+          pagePF,
+          URL_protofolio,
+          user_id,
+          clValue,
+          profitPerLevel,
+          openStock,
+          robot_id
+        );
+
+        // TURN OFF ROBOT
+        if (now >= closeTime) {
+          job.stop();
+
+          thisMessage =
+            "Robot telah selesai dengan close time (sell by time no).";
+          let exec = [];
+
+          exec[0] = await setInitBuySell(page, user_id);
+          exec[1] = await page.waitFor(5000);
+          exec[2] = await setTransactionData(
+            pageTrx,
+            user_id,
+            spreadPerLevel,
+            robot_id
+          );
+          exec[3] = await page.waitFor(5000);
+          exec[4] = await setOffRobotStatus(robot_id, thisMessage);
+          exec[5] = await page.waitFor(5000);
+          exec[6] = await browser.close();
+
+          Promise.all(exec).then(() => {
+            console.log(
+              "Robot " +
+                robot_id +
+                " : setInitBuySell setTransactionData setOffRobotStatus finish!!!"
+            );
           });
         }
       }
 
-      console.log("Robot " + robot_id + " : now = ", now);
-      console.log("Robot " + robot_id + " : closeTime = ", closeTime);
-      if (now >= closeTime) {
-        job.stop();
+      console.log(
+        "Robot " + robot_id + " : main job globalIndex = ",
+        globalIndex
+      );
+      globalIndex++;
+    } catch (error) {
+      job.stop();
+      jobSecondary.start();
+      await closeErrorRobot(res, browser, thisMessage, robot_id);
+    }
+  });
 
-        let message = "Robot has done.";
-        let execSellTimeFalse = [];
+  // secondary job
+  const jobSecondary = new CronJob("*/120 * * * * *", async function() {
+    // INNITIATION
+    settings = await getSettingData(user_id);
+    let now = moment().format("HH:mm:ss");
+    let is_sell_by_time = settings.is_sell_by_time;
+    let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+    let sell_time = moment(getSellTime).format("HH:mm:ss");
+    let getCloseTime = moment("16:15:00", "HH:mm:ss");
+    let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
-        // execSellTimeFalse[2] = await getUpdateSettingData(page, URL_protofolio, thisUser);
-        // execSellTimeFalse[3] = await page.waitFor(5000);
-        execSellTimeFalse[0] = await setTransactionData(
-          pageTrx,
-          user_id,
-          spreadPerLevel,
-          robot_id
-        );
-        execSellTimeFalse[1] = await page.waitFor(5000);
-        execSellTimeFalse[3] = await setOffRobotStatus(robot_id, message);
-        execSellTimeFalse[4] = await page.waitFor(5000);
-        execSellTimeFalse[5] = await browser.close();
+    await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
+    await page.waitFor(5000);
 
-        Promise.all(execSellTimeFalse).then(() => {
-          console.log(
-            "Robot " +
-              robot_id +
-              " : getUpdateSettingData setTransactionData setOffRobotStatus finish!!!"
-          );
-        });
+    // SELL BY TIME (ON)
+    if (is_sell_by_time == "true") {
+      if (now >= sell_time) {
+        jobSecondary.stop();
       }
     } else {
       // SELL BY TIME (OFF)
-      await sellByTimeOffTrigger(
-        page,
-        pagePF,
-        URL_protofolio,
-        user_id,
-        clValue,
-        profitPerLevel,
-        openStock,
-        robot_id
-      );
-
       // TURN OFF ROBOT
       if (now >= closeTime) {
-        job.stop();
-
-        let message = "Robot has done.";
-        let exec = [];
-
-        exec[0] = await setInitBuySell(page, user_id);
-        exec[1] = await page.waitFor(5000);
-        exec[2] = await setTransactionData(
-          pageTrx,
-          user_id,
-          spreadPerLevel,
-          robot_id
-        );
-        exec[3] = await page.waitFor(5000);
-        exec[4] = await setOffRobotStatus(robot_id, message);
-        exec[5] = await page.waitFor(5000);
-        exec[6] = await browser.close();
-
-        Promise.all(exec).then(() => {
-          console.log(
-            "Robot " +
-              robot_id +
-              " : setInitBuySell setTransactionData setOffRobotStatus finish!!!"
-          );
-        });
+        jobSecondary.stop();
       }
-    }
-
-    // AUTOMATION SELL
-    if (matchStockSell.length > 0) {
-      await automationSells(page, matchStockSell, robot_id, user_id);
-    }
-
-    // AUTOMATION BUY
-    if (matchStockBuy.length > 0) {
-      await automationBuys(page, matchStockBuy, robot_id, user_id);
     }
 
     await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
@@ -421,6 +445,7 @@ async function automation(
   });
 
   job.start();
+  jobSecondary.start();
 }
 
 // automation initiation buys (is_sell_by_time == true)
@@ -521,7 +546,7 @@ async function automationInitBuysSellTimeFalse(
 
 // automation sells
 async function automationSells(page, matchStockBuys, robot_id, user_id) {
-  let dataStockSell = matchStockBuys;
+  let dataStockSell = await matchStockBuys;
 
   console.log("Robot " + robot_id + " : dataStockSell", dataStockSell);
 
@@ -545,30 +570,33 @@ async function automationSells(page, matchStockBuys, robot_id, user_id) {
   });
 
   let getDataStockSell = await dataDB[2];
-  let stocksSell = [];
-  for (let i = 0; i < (await getDataStockSell.length); i++) {
-    stocksSell.push(
-      await stockSell(page, await getDataStockSell[i], stockSell)
-    );
-    await updateStockTransaction(await getDataStockSell[i]);
-  }
 
-  // run sell stock
-  Promise.all(stocksSell).then(() => {
-    console.log("Robot " + robot_id + " : stocksSell finish!!!");
-  });
+  if ((await getDataStockSell.length) > 0) {
+    let stocksSell = [];
+    for (let i = 0; i < (await getDataStockSell.length); i++) {
+      stocksSell.push(
+        await stockSell(page, await getDataStockSell[i], robot_id)
+      );
+      await updateStockTransaction(await getDataStockSell[i]);
+    }
+
+    // run sell stock
+    Promise.all(stocksSell).then(() => {
+      console.log("Robot " + robot_id + " : stocksSell finish!!!");
+    });
+  }
 }
 
 // automation buys
 async function automationBuys(page, matchStockSells, robot_id, user_id) {
-  let dataStockBuy = matchStockSells;
+  let dataStockBuy = await matchStockSells;
 
   console.log("Robot " + robot_id + " : dataStockBuy", dataStockBuy);
 
   // set data stock buy
   let dataDB = [];
 
-  dataDB[0] = setStockBuy(dataStockBuy);
+  dataDB[0] = setStockBuy(dataStockBuy, robot_id);
   dataDB[1] = await page.waitFor(2000);
   dataDB[2] = getStockBuy(user_id);
   dataDB[3] = console.log(
@@ -578,20 +606,26 @@ async function automationBuys(page, matchStockSells, robot_id, user_id) {
   dataDB[4] = await page.waitFor(2000);
 
   Promise.all(dataDB).then(() => {
-    console.log("Robot " + robot_id + " : setStockBuy getStockBuy finish!!!");
+    console.log(
+      "Robot " + robot_id + " : setStockBuy getStockBuy finish!!!",
+      dataDB[2]
+    );
   });
 
   let getDataStockBuy = await dataDB[2];
-  let stocksBuy = [];
-  for (let i = 0; i < (await getDataStockBuy.length); i++) {
-    stocksBuy.push(await stockBuy(page, await getDataStockBuy[i], robot_id));
-    await updateStockTransaction(await getDataStockBuy[i]);
-  }
 
-  // run buy stock
-  Promise.all(stocksBuy).then(() => {
-    console.log("Robot " + robot_id + " : stocksBuy finish!!!");
-  });
+  if ((await getDataStockBuy.length) > 0) {
+    let stocksBuy = [];
+    for (let i = 0; i < (await getDataStockBuy.length); i++) {
+      stocksBuy.push(await stockBuy(page, await getDataStockBuy[i], robot_id));
+      await updateStockTransaction(await getDataStockBuy[i]);
+    }
+
+    // run buy stock
+    Promise.all(stocksBuy).then(() => {
+      console.log("Robot " + robot_id + " : stocksBuy finish!!!");
+    });
+  }
 }
 
 // automation sells by time on
@@ -613,18 +647,20 @@ async function automationSellByTimes(page, openStockSells, user_id, robot_id) {
   });
 
   let dataSellStock = await dataDB[2];
-  let stocksSellByTime = [];
-  for (let i = 0; i < (await dataSellStock.length); i++) {
-    stocksSellByTime.push(
-      await stockSellByTime(page, await dataSellStock[i], stockSellByTime)
-    );
-    await updateStockTransaction(await dataSellStock[i]);
-  }
+  if (dataSellStock.length > 0) {
+    let stocksSellByTime = [];
+    for (let i = 0; i < (await dataSellStock.length); i++) {
+      stocksSellByTime.push(
+        await stockSellByTime(page, await dataSellStock[i], robot_id)
+      );
+      await updateStockTransaction(await dataSellStock[i]);
+    }
 
-  // run sell stock
-  Promise.all(stocksSellByTime).then(() => {
-    console.log("Robot " + robot_id + " : stocksSellByTime finish!!!");
-  });
+    // run sell stock
+    Promise.all(stocksSellByTime).then(() => {
+      console.log("Robot " + robot_id + " : stocksSellByTime finish!!!");
+    });
+  }
 }
 
 // automation sells by time off
@@ -654,54 +690,61 @@ async function automationSellByTimesOff(
   });
 
   let dataSellStock = await dataDB[2];
-  let stocksSellByTime = [];
-  for (let i = 0; i < (await dataSellStock.length); i++) {
-    stocksSellByTime.push(
-      await stockSellByTimeOff(page, await dataSellStock[i], robot_id)
-    );
-    await updateStockTransaction(await dataSellStock[i]);
-  }
 
-  // run sell stock
-  Promise.all(stocksSellByTime).then(() => {
-    console.log("Robot " + robot_id + " : stocksSellByTime finish!!!");
-  });
+  if (dataSellStock.length > 0) {
+    let stocksSellByTime = [];
+    for (let i = 0; i < (await dataSellStock.length); i++) {
+      stocksSellByTime.push(
+        await stockSellByTimeOff(page, await dataSellStock[i], robot_id)
+      );
+      await updateStockTransaction(await dataSellStock[i]);
+    }
+
+    // run sell stock
+    Promise.all(stocksSellByTime).then(() => {
+      console.log("Robot " + robot_id + " : stocksSellByTime finish!!!");
+    });
+  }
 }
 
 // automation withdraw stock sell (sell by time on)
 async function automationWithdrawStockSell(page, withdrawData, robot_id) {
   let data = await withdrawData;
-  let withdrawStockSell = [];
+  if (data.length > 0) {
+    let withdrawStockSell = [];
 
-  for (let i = data.length - 1; i >= 0; i--) {
-    if (data[i].mode == "Sell") {
-      withdrawStockSell.push(
-        await setWithdrawStockSell(page, await data[i], i, robot_id)
-      );
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (data[i].mode == "Sell") {
+        withdrawStockSell.push(
+          await setWithdrawStockSell(page, await data[i], i, robot_id)
+        );
+      }
     }
-  }
 
-  // run withdraw stock
-  Promise.all(withdrawStockSell).then(() => {
-    console.log("Robot " + robot_id + " : withdrawStockSell finish!!!");
-  });
+    // run withdraw stock
+    Promise.all(withdrawStockSell).then(() => {
+      console.log("Robot " + robot_id + " : withdrawStockSell finish!!!");
+    });
+  }
 }
 
 // automation withdraw stock sell (sell by time off)
 async function automationWithdrawStockSellOff(page, withdrawData, robot_id) {
   let data = await withdrawData;
-  let withdrawStockSell = [];
+  if (data.length > 0) {
+    let withdrawStockSell = [];
 
-  for (let i = data.length - 1; i >= 0; i--) {
-    withdrawStockSell.push(
-      await setWithdrawStockSell(page, await data[i], data[i].index, robot_id)
-    );
+    for (let i = data.length - 1; i >= 0; i--) {
+      withdrawStockSell.push(
+        await setWithdrawStockSell(page, await data[i], data[i].index, robot_id)
+      );
+    }
+
+    // run withdraw stock
+    Promise.all(withdrawStockSell).then(() => {
+      console.log("Robot " + robot_id + " : withdrawStockSell finish!!!");
+    });
   }
-
-  // run withdraw stock
-  Promise.all(withdrawStockSell).then(() => {
-    console.log("Robot " + robot_id + " : withdrawStockSell finish!!!");
-  });
 }
 
 // set automation withdraw rhb
@@ -1384,8 +1427,10 @@ async function getStockSellByTime(user_id) {
 }
 
 // set stock buy
-async function setStockBuy(stockData) {
+async function setStockBuy(stockData, robot_id) {
   let err, stockBuy;
+
+  console.log("Robot " + robot_id + " : stockData", stockData);
 
   stockData.forEach(async el => {
     [err, stockBuy] = await to(
@@ -1551,7 +1596,7 @@ async function getLot(stockBudget, level, price, robot_id) {
 }
 
 // login
-async function login(browser, page, username, password, robot_id) {
+async function login(res, browser, page, username, password, robot_id) {
   try {
     await page.type("input[id='j_username']", username);
     await page.type("input[id='password']", password);
@@ -1589,12 +1634,12 @@ async function login(browser, page, username, password, robot_id) {
     await page.click("button[type=submit]");
   } catch (error) {
     let msg = "Gagal bypass captcha";
-    await closeErrorRobot(browser, msg, robot_id);
+    await closeErrorRobot(res, browser, msg, robot_id);
   }
 }
 
 // login trading
-async function loginTrading(browser, page, URL_runningTrade, pin) {
+async function loginTrading(res, browser, page, URL_runningTrade, pin) {
   try {
     await page.goto(URL_runningTrade);
     await page.click("button[onclick='objPopup.showLoginTrading();']");
@@ -1602,7 +1647,7 @@ async function loginTrading(browser, page, URL_runningTrade, pin) {
     await page.click("input[id='_ltEnter']");
   } catch (error) {
     let msg = "Gagal login pin trading";
-    await closeErrorRobot(browser, msg, robot_id);
+    await closeErrorRobot(res, browser, msg, robot_id);
   }
 }
 
@@ -1803,6 +1848,7 @@ async function withdraws(pageWd, URL_accountinfo, robot_id, user_id) {
 
 // get withdraw data
 async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
+  const data = [];
   let now = moment()
     .subtract(1, "months")
     .format("MM/01/YYYY");
@@ -1816,7 +1862,7 @@ async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
 
   try {
     await page.waitFor(1000);
-    const data = await page.evaluate(() => {
+    data = await page.evaluate(() => {
       return new Promise((resolve, reject) => {
         let table = document.querySelector("#_requestTable");
         let row = table.children;
@@ -1843,7 +1889,7 @@ async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
     return data;
   } catch (err) {
     console.log("Robot " + robot_id + " : fail get withdraw data");
-    return err;
+    return [];
   }
 }
 
@@ -2172,21 +2218,6 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 
   let err, transaction;
 
-  getDataTransaction.forEach(async el => {
-    el.user_id = user_id;
-    // set data
-    [err, transaction] = await to(
-      Transaction.findOne({ where: { order_id: el.order_id } })
-    );
-    if (!transaction) {
-      console.log("Robot " + robot_id + " : ", el);
-      [err, transaction] = await to(Transaction.create(el));
-    } else {
-      transaction.set(el);
-      [err, transaction] = await to(transaction.save());
-    }
-  });
-
   let dataStock = {};
   let dataStockBuy = [];
   let dataStockSell = [];
@@ -2197,53 +2228,70 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 
   let openStock = [];
 
-  getDataTransaction.forEach(async (el, i) => {
-    let spl = parseInt(spreadPerLevel);
-    let spread = 0;
+  if (getDataTransaction.length > 0) {
+    getDataTransaction.forEach(async el => {
+      el.user_id = user_id;
+      // set data
+      [err, transaction] = await to(
+        Transaction.findOne({ where: { order_id: el.order_id } })
+      );
+      if (!transaction) {
+        console.log("Robot " + robot_id + " : ", el);
+        [err, transaction] = await to(Transaction.create(el));
+      } else {
+        transaction.set(el);
+        [err, transaction] = await to(transaction.save());
+      }
+    });
 
-    spread = Math.round(el.price * (spl / 100));
+    getDataTransaction.forEach(async (el, i) => {
+      let spl = parseInt(spreadPerLevel);
+      let spread = 0;
 
-    if (el.status == "Open") {
-      openStock.push(el);
-    }
+      spread = Math.round(el.price * (spl / 100));
 
-    if (el.mode == "Buy") {
-      dataStockSell.push({
-        order_id: el.order_id,
-        user_id: user_id,
-        stock: el.stock,
-        mode: el.mode,
-        lots: el.lots,
-        status: el.status,
-        priceBuy: el.price,
-        priceSell: (parseInt(el.price) + spread).toString(),
-        createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-        updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-      });
-    } else if (el.mode == "Sell") {
-      dataStockBuy.push({
-        order_id: el.order_id,
-        user_id: user_id,
-        stock: el.stock,
-        mode: el.mode,
-        lots: el.lots,
-        status: el.status,
-        priceBuy: (parseInt(el.price) - spread).toString(),
-        priceSell: el.price,
-        createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
-        updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
-      });
-    }
-  });
+      if (el.status == "Open") {
+        openStock.push(el);
+      }
 
-  // order buy matched = need to sell
-  matchStockSell = dataStockSell.filter(el => el.status == "Matched");
-  // data order sell with status = open
-  openStockSell = dataStockBuy.filter(el => el.status == "Open");
-  // order sell matched = need to buy
-  matchStockBuy = dataStockBuy.filter(el => el.status == "Matched");
-  // data order buy with status = open
-  openStockBuy = dataStockSell.filter(el => el.status == "Open");
+      if (el.mode == "Buy") {
+        dataStockBuy.push({
+          order_id: el.order_id,
+          user_id: user_id,
+          stock: el.stock,
+          mode: el.mode,
+          lots: el.lots,
+          status: el.status,
+          priceBuy: el.price,
+          priceSell: (parseInt(el.price) + spread).toString(),
+          createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+        });
+      } else if (el.mode == "Sell") {
+        dataStockSell.push({
+          order_id: el.order_id,
+          user_id: user_id,
+          stock: el.stock,
+          mode: el.mode,
+          lots: el.lots,
+          status: el.status,
+          priceBuy: (parseInt(el.price) - spread).toString(),
+          priceSell: el.price,
+          createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+        });
+      }
+    });
+
+    // order buy matched = need to sell
+    matchStockSell = dataStockSell.filter(el => el.status == "Matched");
+    // data order sell with status = open
+    openStockSell = dataStockSell.filter(el => el.status == "Open");
+    // order sell matched = need to buy
+    matchStockBuy = dataStockBuy.filter(el => el.status == "Matched");
+    // data order buy with status = open
+    openStockBuy = dataStockBuy.filter(el => el.status == "Open");
+  }
 
   dataStock = {
     dataStockSell,
@@ -2286,7 +2334,7 @@ async function setInitBuySell(page, user_id) {
 }
 
 // close error robot
-async function closeErrorRobot(browser, msg, robot_id) {
+async function closeErrorRobot(res, browser, msg, robot_id) {
   let message = msg;
   let exec = [];
 
@@ -2296,4 +2344,12 @@ async function closeErrorRobot(browser, msg, robot_id) {
   Promise.all(exec).then(() => {
     console.log("Robot " + robot_id + " : setOffRobotStatus finish!!!");
   });
+
+  return res.json(
+    {
+      success: 0,
+      message: "Robot failed to run."
+    },
+    500
+  );
 }
