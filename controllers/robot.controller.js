@@ -306,12 +306,12 @@ async function automation(
       let openStock = transaction.openStock;
 
       // AUTOMATION SELL
-      if (matchStockSell.length > 0) {
+      if (matchStockBuy.length > 0) {
         await automationSells(page, matchStockBuy, robot_id, user_id);
       }
 
       // AUTOMATION BUY
-      if (matchStockBuy.length > 0) {
+      if (matchStockSell.length > 0) {
         await automationBuys(page, matchStockSell, robot_id, user_id);
       }
 
