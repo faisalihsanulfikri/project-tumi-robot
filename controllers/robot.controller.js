@@ -1100,7 +1100,10 @@ async function stockInitBuy(
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : ##############################################"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      "Robot " +
+      robot_id +
+      " : ##############################################"
   );
 
   return await page.waitFor(1000);
@@ -1143,7 +1146,10 @@ async function stockInitBuySellTimeOff(page, lastInit, robot_id) {
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : ##############################################"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      "Robot " +
+      robot_id +
+      " : ##############################################"
   );
 
   return await page.waitFor(1000);
@@ -1186,7 +1192,10 @@ async function stockInitSellSellTimeOff(page, lastInit, robot_id) {
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : ##############################################"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      "Robot " +
+      robot_id +
+      " : ##############################################"
   );
 
   return await page.waitFor(1000);
@@ -1294,7 +1303,10 @@ async function stockSellByTime(page, dataStockSell, robot_id) {
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : ##############################################"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      "Robot " +
+      robot_id +
+      " : ##############################################"
   );
 
   return await page.waitFor(1000);
@@ -1335,7 +1347,10 @@ async function stockSellByTimeOff(page, dataStockSell, robot_id) {
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : ##############################################"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      "Robot " +
+      robot_id +
+      " : ##############################################"
   );
 
   return await page.waitFor(1000);
@@ -1393,7 +1408,10 @@ async function stockBuy(page, dataStockBuy, robot_id) {
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : ##############################################"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      "Robot " +
+      robot_id +
+      " : ##############################################"
   );
 
   return await page.waitFor(1000);
