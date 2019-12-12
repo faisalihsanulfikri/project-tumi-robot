@@ -508,7 +508,38 @@ async function automation(
   } else {
     // initiation buy failed
     thisMessage = "Gagal initiation buy";
-    await closeErrorRobot(res, browser, thisMessage, robot_id);
+    await setRobotStatusInitFail(robot_id, thisMessage);
+
+    const jobFailInitBuy = new CronJob("*/120 * * * * *", async function() {
+      // INNITIATION
+      let now = moment().format("HH:mm:ss");
+      let getCloseTime = moment("16:15:00", "HH:mm:ss");
+      let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+      // TURN OFF ROBOT
+      if (now >= closeTime) {
+        jobFailInitBuy.stop();
+
+        thisMessage = "Robot telah selesai namun gagal initiation buy.";
+        let exec = [];
+
+        exec[0] = await setOffRobotStatus(robot_id, thisMessage);
+        exec[1] = await page.waitFor(5000);
+        exec[2] = await browser.close();
+
+        Promise.all(exec).then(() => {
+          console.log("Robot " + robot_id + " : setOffRobotStatus finish!!!");
+        });
+      }
+
+      console.log(
+        "Robot " + robot_id + " : jobFailInitBuy globalIndex = ",
+        globalIndex
+      );
+      globalIndex++;
+    });
+
+    jobFailInitBuy.start();
   }
 }
 
@@ -2038,6 +2069,19 @@ async function setOffRobotStatus(robot_id, message) {
 
   data = {
     status: "off",
+    off_message: message
+  };
+
+  [err, robot] = await to(Robot.findOne({ where: { id: robot_id } }));
+  robot.set(data);
+  [err, robot] = await to(robot.save());
+}
+
+// set off robot status
+async function setRobotStatusInitFail(robot_id, message) {
+  let robot, data;
+
+  data = {
     off_message: message
   };
 
