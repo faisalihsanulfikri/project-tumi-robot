@@ -26,8 +26,6 @@ let globalIndex = 0;
 let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
 let thisInitBuy = true;
 
-let botTime = moment().format("YYYY-MM-DD HH:mm:ss");
-
 module.exports.run = async function(req, res) {
   let robot_id = req.params.robot_id;
   const URL_login =
@@ -50,7 +48,7 @@ module.exports.run = async function(req, res) {
 
   /** END TEST */
 
-  console.log(botTime + " Robot " + robot_id);
+  console.log(moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id);
 
   /**
    * OPEN BROWSER
@@ -138,8 +136,20 @@ module.exports.run = async function(req, res) {
       let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
       let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
-      console.log(botTime + " Robot " + robot_id + " : now", now);
-      console.log(botTime + " Robot " + robot_id + " : buy_time", buy_time);
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : now",
+        now
+      );
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : buy_time",
+        buy_time
+      );
 
       if (now >= buy_time) {
         isMoreThanBuyTime.stop();
@@ -258,7 +268,12 @@ async function main(
     );
   });
 
-  console.log(botTime + " Robot " + robot_id + " : main automation");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : main automation"
+  );
 }
 
 // automation
@@ -313,7 +328,10 @@ async function automation(
       await inputStockRangking(pageSR);
 
       console.log(
-        botTime + " Robot " + robot_id + " : globalIndex = ",
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : globalIndex = ",
         globalIndex
       );
       globalIndex++;
@@ -359,13 +377,25 @@ async function automation(
 
         // SELL BY TIME (ON)
         if (is_sell_by_time == "true") {
-          console.log(botTime + " Robot " + robot_id + " : now = ", now);
           console.log(
-            botTime + " Robot " + robot_id + " : sell time = ",
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : now = ",
+            now
+          );
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : sell time = ",
             sell_time
           );
           console.log(
-            botTime + " Robot " + robot_id + " : openStockSell = ",
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : openStockSell = ",
             openStockSell
           );
           if (now >= sell_time) {
@@ -404,9 +434,18 @@ async function automation(
             });
           }
         } else {
-          console.log(botTime + " Robot " + robot_id + " : now = ", now);
           console.log(
-            botTime + " Robot " + robot_id + " : closeTime = ",
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : now = ",
+            now
+          );
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : closeTime = ",
             closeTime
           );
           // SELL BY TIME (OFF)
@@ -503,7 +542,12 @@ async function automationInitBuys(
 
   // run initiation buy stock
   Promise.all(stocksInitBuy).then(() => {
-    console.log(botTime + " Robot " + robot_id + " : finish initiation buy!!!");
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : finish initiation buy!!!"
+    );
   });
 }
 
@@ -574,7 +618,10 @@ async function automationSells(page, matchStockBuys, robot_id, user_id) {
   let dataStockSell = await matchStockBuys;
 
   console.log(
-    botTime + " Robot " + robot_id + " : dataStockSell",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : dataStockSell",
     dataStockSell
   );
 
@@ -610,7 +657,12 @@ async function automationSells(page, matchStockBuys, robot_id, user_id) {
 
     // run sell stock
     Promise.all(stocksSell).then(() => {
-      console.log(botTime + " Robot " + robot_id + " : stocksSell finish!!!");
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : stocksSell finish!!!"
+      );
     });
   }
 }
@@ -619,7 +671,13 @@ async function automationSells(page, matchStockBuys, robot_id, user_id) {
 async function automationBuys(page, matchStockSells, robot_id, user_id) {
   let dataStockBuy = await matchStockSells;
 
-  console.log(botTime + " Robot " + robot_id + " : dataStockBuy", dataStockBuy);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : dataStockBuy",
+    dataStockBuy
+  );
 
   // set data stock buy
   let dataDB = [];
@@ -651,7 +709,12 @@ async function automationBuys(page, matchStockSells, robot_id, user_id) {
 
     // run buy stock
     Promise.all(stocksBuy).then(() => {
-      console.log(botTime + " Robot " + robot_id + " : stocksBuy finish!!!");
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : stocksBuy finish!!!"
+      );
     });
   }
 }
@@ -666,7 +729,7 @@ async function automationSellByTimes(page, openStockSells, user_id, robot_id) {
   dataDB[1] = await page.waitFor(2000);
   dataDB[2] = getStockSellByTime(user_id);
   dataDB[3] = console.log(
-    botTime + " Robot " + robot_id + " : dataDB",
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : dataDB",
     await dataDB[2]
   );
   dataDB[4] = await page.waitFor(2000);
@@ -690,7 +753,10 @@ async function automationSellByTimes(page, openStockSells, user_id, robot_id) {
     // run sell stock
     Promise.all(stocksSellByTime).then(() => {
       console.log(
-        botTime + " Robot " + robot_id + " : stocksSellByTime finish!!!"
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : stocksSellByTime finish!!!"
       );
     });
   }
@@ -736,7 +802,10 @@ async function automationSellByTimesOff(
     // run sell stock
     Promise.all(stocksSellByTime).then(() => {
       console.log(
-        botTime + " Robot " + robot_id + " : stocksSellByTime finish!!!"
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : stocksSellByTime finish!!!"
       );
     });
   }
@@ -759,7 +828,10 @@ async function automationWithdrawStockSell(page, withdrawData, robot_id) {
     // run withdraw stock
     Promise.all(withdrawStockSell).then(() => {
       console.log(
-        botTime + " Robot " + robot_id + " : withdrawStockSell finish!!!"
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : withdrawStockSell finish!!!"
       );
     });
   }
@@ -780,7 +852,10 @@ async function automationWithdrawStockSellOff(page, withdrawData, robot_id) {
     // run withdraw stock
     Promise.all(withdrawStockSell).then(() => {
       console.log(
-        botTime + " Robot " + robot_id + " : withdrawStockSell finish!!!"
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : withdrawStockSell finish!!!"
       );
     });
   }
@@ -804,7 +879,10 @@ async function automationSetWithdrawRhb(
 
   Promise.all(dataDB).then(() => {
     console.log(
-      botTime + " Robot " + robot_id + " : getWithdrawData finish!!!"
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : getWithdrawData finish!!!"
     );
   });
 
@@ -826,7 +904,12 @@ async function automationSetWithdrawRhb(
 
     // run sell stock
     Promise.all(execWithdraw).then(() => {
-      console.log(botTime + " Robot " + robot_id + " : execWithdraw finish!!!");
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : execWithdraw finish!!!"
+      );
     });
   }
 }
@@ -936,7 +1019,10 @@ async function stockInitBuy(
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
-  console.log(botTime + " Robot " + robot_id + " : stock ", stock);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : stock ",
+    stock
+  );
   await page.goto(URL_orderpad_buy);
   await page.type("input[id='_stockCode']", stock);
   await page.keyboard.press(String.fromCharCode(13));
@@ -964,10 +1050,24 @@ async function stockInitBuy(
     thisInitBuy = false;
   }
 
-  console.log(botTime + " Robot " + robot_id + " : price ", await price);
-  console.log(botTime + " Robot " + robot_id + " : lot ", lot);
-  console.log(botTime + " Robot " + robot_id + " : price[] ", await price[i]);
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : price ",
+    await price
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : lot ",
+    lot
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : price[] ",
+    await price[i]
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : ##############################################"
   );
@@ -1000,9 +1100,17 @@ async function stockInitBuySellTimeOff(page, lastInit, robot_id) {
     );
   }
 
-  console.log(botTime + " Robot " + robot_id + " : price ", price);
-  console.log(botTime + " Robot " + robot_id + " : lot ", lots);
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : price ",
+    price
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : lot ",
+    lots
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : ##############################################"
   );
@@ -1035,9 +1143,17 @@ async function stockInitSellSellTimeOff(page, lastInit, robot_id) {
     );
   }
 
-  console.log(botTime + " Robot " + robot_id + " : price ", price);
-  console.log(botTime + " Robot " + robot_id + " : lot ", lots);
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : price ",
+    price
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : lot ",
+    lots
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : ##############################################"
   );
@@ -1054,9 +1170,24 @@ async function stockSell(page, dataStockSell, robot_id) {
   let priceBuy = dataStockSell.priceBuy;
   let lots = dataStockSell.lots;
 
-  console.log(botTime + " Robot " + robot_id + " : stock ", stock);
-  console.log(botTime + " Robot " + robot_id + " : priceBuy ", priceBuy);
-  console.log(botTime + " Robot " + robot_id + " : priceSell ", priceSell);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : stock ",
+    stock
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : priceBuy ",
+    priceBuy
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : priceSell ",
+    priceSell
+  );
 
   if (parseInt(priceSell) >= 50) {
     await page.goto(URL_orderpad_sell);
@@ -1072,12 +1203,17 @@ async function stockSell(page, dataStockSell, robot_id) {
     await page.click("button[id='_confirm']");
     await page.waitFor(1000);
     console.log(
-      botTime + " Robot " + robot_id + " : =-=-=-=-=SELL=-=-=-=-=",
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : =-=-=-=-=SELL=-=-=-=-=",
       priceSell
     );
   }
 
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : #############################################S"
   );
@@ -1092,7 +1228,10 @@ async function stockSellByTime(page, dataStockSell, robot_id) {
   let stock = dataStockSell.stock;
   let lots = dataStockSell.lots;
 
-  console.log(botTime + " Robot " + robot_id + " : stock ", stock);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : stock ",
+    stock
+  );
 
   await page.goto(URL_orderpad_sell);
 
@@ -1102,7 +1241,10 @@ async function stockSellByTime(page, dataStockSell, robot_id) {
 
   let bidPrice = await getBidPrice(page);
 
-  console.log(botTime + " Robot " + robot_id + " : type ", bidPrice);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : type ",
+    bidPrice
+  );
 
   if (bidPrice != "&nbsp;") {
     await page.type("input[id='_volume']", lots);
@@ -1117,7 +1259,9 @@ async function stockSellByTime(page, dataStockSell, robot_id) {
     );
   }
 
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : ##############################################"
   );
@@ -1134,7 +1278,10 @@ async function stockSellByTimeOff(page, dataStockSell, robot_id) {
 
   let priceSell = dataStockSell.priceSell;
 
-  console.log(botTime + " Robot " + robot_id + " : stock ", stock);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : stock ",
+    stock
+  );
 
   await page.goto(URL_orderpad_sell);
 
@@ -1153,7 +1300,9 @@ async function stockSellByTimeOff(page, dataStockSell, robot_id) {
     priceSell
   );
 
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : ##############################################"
   );
@@ -1171,9 +1320,24 @@ async function stockBuy(page, dataStockBuy, robot_id) {
   let priceBuy = dataStockBuy.priceBuy;
   let lots = dataStockBuy.lots;
 
-  console.log(botTime + " Robot " + robot_id + " : stock ", stock);
-  console.log(botTime + " Robot " + robot_id + " : priceBuy ", priceBuy);
-  console.log(botTime + " Robot " + robot_id + " : priceSell ", priceSell);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : stock ",
+    stock
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : priceBuy ",
+    priceBuy
+  );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : priceSell ",
+    priceSell
+  );
 
   await page.goto(URL_orderpad_buy);
   await page.type("input[id='_stockCode']", stock);
@@ -1187,11 +1351,16 @@ async function stockBuy(page, dataStockBuy, robot_id) {
   await page.click("button[id='_confirm']");
   await page.waitFor(1000);
   console.log(
-    botTime + " Robot " + robot_id + " : =-=-=-=-=BUY=-=-=-=-=",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : =-=-=-=-=BUY=-=-=-=-=",
     priceBuy
   );
 
-  console.log(botTime + " Robot " + robot_id + " : finish");
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
+  );
   console.log(
     "Robot " + robot_id + " : ##############################################"
   );
@@ -1406,7 +1575,13 @@ async function getUsers(robot_id) {
 async function setStockSell(stockData, robot_id) {
   let err, stockSell;
 
-  console.log(botTime + " Robot " + robot_id + " : stockData", stockData);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : stockData",
+    stockData
+  );
 
   stockData.forEach(async el => {
     [err, stockSell] = await to(
@@ -1480,7 +1655,13 @@ async function getStockSellByTime(user_id) {
 async function setStockBuy(stockData, robot_id) {
   let err, stockBuy;
 
-  console.log(botTime + " Robot " + robot_id + " : stockData", stockData);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : stockData",
+    stockData
+  );
 
   stockData.forEach(async el => {
     [err, stockBuy] = await to(
@@ -1541,7 +1722,12 @@ async function setWithdrawStockSell(page, withdrawData, i, robot_id) {
 
   // run withdraw stock
   Promise.all(steps).then(() => {
-    console.log(botTime + " Robot " + robot_id + " : withdrawStockSell");
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : withdrawStockSell"
+    );
   });
 
   await page.waitFor(2000);
@@ -1634,11 +1820,17 @@ async function getClosePrice(page) {
 
 // get lot
 async function getLot(stockBudget, level, price, robot_id) {
-  console.log(botTime + " Robot " + robot_id + " : stockBudget, level, price", {
-    stockBudget: parseInt(stockBudget),
-    level: level,
-    price: parseInt(price)
-  });
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : stockBudget, level, price",
+    {
+      stockBudget: parseInt(stockBudget),
+      level: level,
+      price: parseInt(price)
+    }
+  );
 
   return Math.round(
     parseInt(stockBudget) / level / parseInt(price) / 100
@@ -1678,7 +1870,13 @@ async function login(res, browser, page, username, password, robot_id) {
       return token;
     });
 
-    console.log(botTime + " Robot " + robot_id + " : token ", tokenCaptcha);
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : token ",
+      tokenCaptcha
+    );
 
     await page.type("input[id='j_token']", tokenCaptcha);
     await page.click("button[type=submit]");
@@ -1892,7 +2090,12 @@ async function withdraws(pageWd, URL_accountinfo, robot_id, user_id) {
 
   // run withdraw stock
   Promise.all(exec).then(() => {
-    console.log(botTime + " Robot " + robot_id + " : withdraw Execute");
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : withdraw Execute"
+    );
   });
 }
 
@@ -1938,7 +2141,12 @@ async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
     });
     return data;
   } catch (err) {
-    console.log(botTime + " Robot " + robot_id + " : fail get withdraw data");
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : fail get withdraw data"
+    );
     return [];
   }
 }
@@ -2286,7 +2494,10 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
         Transaction.findOne({ where: { order_id: el.order_id } })
       );
       if (!transaction) {
-        console.log(botTime + " Robot " + robot_id + " : ", el);
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : ",
+          el
+        );
         [err, transaction] = await to(Transaction.create(el));
       } else {
         transaction.set(el);
@@ -2393,7 +2604,10 @@ async function closeErrorRobot(res, browser, msg, robot_id) {
 
   Promise.all(exec).then(() => {
     console.log(
-      botTime + " Robot " + robot_id + " : setOffRobotStatus finish!!!"
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : setOffRobotStatus finish!!!"
     );
   });
 
