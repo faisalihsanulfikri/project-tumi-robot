@@ -241,6 +241,16 @@ async function main(
     );
   }
 
+  console.log(
+    moment().format("HH:mm:ss") +
+      " main Robot " +
+      robot_id +
+      " : thisInitBuy = ",
+    thisInitBuy
+  );
+
+  return;
+
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
   mainExec[2] = await automation(
@@ -295,8 +305,16 @@ async function automation(
   profitPerLevel,
   spreadPerLevel
 ) {
+  console.log(
+    moment().format("HH:mm:ss") +
+      " automation Robot " +
+      robot_id +
+      " : thisInitBuy = ",
+    thisInitBuy
+  );
+
   // initiation buy success
-  if (thisInitBuy) {
+  if (thisInitBuy == true) {
     // secondary job
     const jobSecondary = new CronJob("*/120 * * * * *", async function() {
       // INNITIATION
@@ -507,6 +525,13 @@ async function automation(
     jobSecondary.start();
   } else {
     // initiation buy failed
+    console.log(
+      moment().format("HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : initiation buy failed"
+    );
+
     thisMessage = "Gagal initiation buy";
     await setRobotStatusInitFail(robot_id, thisMessage);
 
@@ -533,7 +558,10 @@ async function automation(
       }
 
       console.log(
-        "Robot " + robot_id + " : jobFailInitBuy globalIndex = ",
+        moment().format("HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : jobFailInitBuy globalIndex = ",
         globalIndex
       );
       globalIndex++;
@@ -632,14 +660,20 @@ async function automationInitBuysSellTimeFalse(
   // run initiation buy stock
   Promise.all(stocksInitSell).then(() => {
     console.log(
-      "Robot " + robot_id + " : finish initiation sell (sell by time off) !!!"
+      moment().format("HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : finish initiation sell (sell by time off) !!!"
     );
   });
 
   // run initiation buy stock
   Promise.all(stocksInitBuy).then(() => {
     console.log(
-      "Robot " + robot_id + " : finish initiation buy (sell by time off) !!!"
+      moment().format("HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : finish initiation buy (sell by time off) !!!"
     );
   });
 }
@@ -1063,6 +1097,14 @@ async function stockInitBuy(
   let price = await getBuyPrice(page, price_type, level, spreadPerLevel);
   let lot = await getLot(stockBudget, level, price[i], robot_id);
 
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : INDEX = ",
+    i
+  );
+
   if (price[i] != "NaN") {
     if (parseInt(price[i]) >= 50) {
       await page.type("input[id='_price']", price[i]);
@@ -1072,7 +1114,10 @@ async function stockInitBuy(
       await page.click("button[id='_confirm']");
       await page.waitFor(1000);
       console.log(
-        "Robot " + robot_id + " : =-=-=-=-=BUY=-=-=-=-=",
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : =-=-=-=-=BUY=-=-=-=-=",
         parseInt(price[i])
       );
     }
@@ -1101,7 +1146,7 @@ async function stockInitBuy(
   );
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
-      "Robot " +
+      " Robot " +
       robot_id +
       " : ##############################################"
   );
@@ -1129,7 +1174,10 @@ async function stockInitBuySellTimeOff(page, lastInit, robot_id) {
     await page.click("button[id='_confirm']");
     await page.waitFor(1000);
     console.log(
-      "Robot " + robot_id + " : =-=-=-=-=BUY INIT=-=-=-=-=",
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : =-=-=-=-=BUY INIT=-=-=-=-=",
       parseInt(price)
     );
   }
@@ -1147,7 +1195,7 @@ async function stockInitBuySellTimeOff(page, lastInit, robot_id) {
   );
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
-      "Robot " +
+      " Robot " +
       robot_id +
       " : ##############################################"
   );
@@ -1175,7 +1223,10 @@ async function stockInitSellSellTimeOff(page, lastInit, robot_id) {
     await page.click("button[id='_confirm']");
     await page.waitFor(1000);
     console.log(
-      "Robot " + robot_id + " : =-=-=-=-=SELL INIT=-=-=-=-=",
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : =-=-=-=-=SELL INIT=-=-=-=-=",
       parseInt(price)
     );
   }
@@ -1193,7 +1244,7 @@ async function stockInitSellSellTimeOff(page, lastInit, robot_id) {
   );
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
-      "Robot " +
+      " Robot " +
       robot_id +
       " : ##############################################"
   );
@@ -1255,7 +1306,10 @@ async function stockSell(page, dataStockSell, robot_id) {
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : finish"
   );
   console.log(
-    "Robot " + robot_id + " : #############################################S"
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : #############################################S"
   );
 
   return await page.waitFor(1000);
@@ -1304,7 +1358,7 @@ async function stockSellByTime(page, dataStockSell, robot_id) {
   );
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
-      "Robot " +
+      " Robot " +
       robot_id +
       " : ##############################################"
   );
@@ -1339,7 +1393,10 @@ async function stockSellByTimeOff(page, dataStockSell, robot_id) {
   await page.click("button[id='_confirm']");
   await page.waitFor(1000);
   console.log(
-    "Robot " + robot_id + " : =-=-=-=-=SELL BY TIME=-=-=-=-=",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : =-=-=-=-=SELL BY TIME=-=-=-=-=",
     priceSell
   );
 
@@ -1348,7 +1405,7 @@ async function stockSellByTimeOff(page, dataStockSell, robot_id) {
   );
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
-      "Robot " +
+      " Robot " +
       robot_id +
       " : ##############################################"
   );
@@ -1409,7 +1466,7 @@ async function stockBuy(page, dataStockBuy, robot_id) {
   );
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
-      "Robot " +
+      " Robot " +
       robot_id +
       " : ##############################################"
   );
