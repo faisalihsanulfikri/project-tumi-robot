@@ -249,8 +249,6 @@ async function main(
     thisInitBuy
   );
 
-  return;
-
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
   mainExec[2] = await automation(
