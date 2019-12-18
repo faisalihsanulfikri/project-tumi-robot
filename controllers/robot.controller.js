@@ -108,20 +108,6 @@ module.exports.run = async function(req, res) {
   let pin = thisUser.pin;
   let user_id = thisUser.user_id;
 
-  // GET SETTING DATA
-  let settings = await getSettingData(user_id);
-
-  let price_type = await settings.price_type;
-  let stock_value_string = await settings.stock_value;
-  let stock_value_data = await stock_value_string.split(",", 4);
-  let stock_mode_id = await settings.stock_mode;
-
-  let initBuyDataStock = await getInitBuyDataStock(
-    price_type,
-    stock_value_data,
-    stock_mode_id
-  );
-
   /** TEST */
 
   /** END TEST */
@@ -184,6 +170,9 @@ module.exports.run = async function(req, res) {
     // LOGIN TRADING
     await loginTrading(res, browser, page, URL_runningTrade, pin);
 
+    // GET SETTING DATA
+    let settings = await getSettingData(user_id);
+
     // GET SETTING DATA IF SELL BY TIME IS TRUE
     let lastInit = await getLastInitBuysSells(user_id);
     if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
@@ -195,6 +184,11 @@ module.exports.run = async function(req, res) {
     let spreadPerLevel = await settings.spread_per_level;
     let profitPerLevel = await settings.profit_per_level;
     let clValue = await settings.cl_value;
+
+    let price_type = await settings.price_type;
+    let stock_value_string = await settings.stock_value;
+    let stock_value_data = await stock_value_string.split(",", 4);
+    let stock_mode_id = await settings.stock_mode;
 
     /** TEST */
 
@@ -225,6 +219,20 @@ module.exports.run = async function(req, res) {
 
       if (now >= buy_time) {
         isMoreThanBuyTime.stop();
+        let initBuyDataStock = await getInitBuyDataStock(
+          price_type,
+          stock_value_data,
+          stock_mode_id
+        );
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : isMoreThanBuyTime",
+          initBuyDataStock
+        );
+
         await main(
           res,
           page,
