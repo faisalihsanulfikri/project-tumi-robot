@@ -1,3 +1,4 @@
+const axios = require("axios");
 const { Init_Buy } = require("../models");
 const { Master_Setting } = require("../models");
 const { Portofolios } = require("../models");
@@ -26,6 +27,69 @@ let globalIndex = 0;
 let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
 let thisInitBuy = true;
 
+async function getStockFromSheet(stockModeId) {
+  let baseURL = process.env.API_URL;
+  let method = "stocks/" + stockModeId;
+  let endpoint = baseURL + "" + method;
+
+  let data = [];
+
+  console.log("endpoint", endpoint);
+
+  let result = axios
+    .get(endpoint)
+    .then(function(response) {
+      console.log("response", response.data);
+
+      data = response.data.data;
+    })
+    .catch(async function(error) {
+      console.log("error.responsenya", error.response);
+    });
+
+  console.log("result", await result);
+
+  return data;
+}
+
+async function getInitBuyDataStock(
+  price_type,
+  stock_value_data,
+  stock_mode_id
+) {
+  let stockFromSheet = await getStockFromSheet(stock_mode_id);
+
+  let initBuyDataStock = [];
+  let filterStockFromSheet = [];
+
+  stock_value_data.forEach(el => {
+    filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
+
+    if (filterStockFromSheet.length > 0) {
+      let stock = filterStockFromSheet[0].stock;
+      let price = "";
+
+      if (price_type == "open") {
+        price = filterStockFromSheet[0].open;
+      }
+      if (price_type == "close") {
+        price = filterStockFromSheet[0].close;
+      }
+      if (price_type == "prev") {
+        price = filterStockFromSheet[0].prev_close;
+      }
+
+      initBuyDataStock.push({
+        stock,
+        price_type,
+        price: price.replace(".", "")
+      });
+    }
+  });
+
+  return initBuyDataStock;
+}
+
 module.exports.run = async function(req, res) {
   let robot_id = req.params.robot_id;
   const URL_login =
@@ -43,6 +107,20 @@ module.exports.run = async function(req, res) {
   let password = thisUser.password;
   let pin = thisUser.pin;
   let user_id = thisUser.user_id;
+
+  // GET SETTING DATA
+  let settings = await getSettingData(user_id);
+
+  let price_type = await settings.price_type;
+  let stock_value_string = await settings.stock_value;
+  let stock_value_data = await stock_value_string.split(",", 4);
+  let stock_mode_id = await settings.stock_mode;
+
+  let initBuyDataStock = await getInitBuyDataStock(
+    price_type,
+    stock_value_data,
+    stock_mode_id
+  );
 
   /** TEST */
 
@@ -106,19 +184,13 @@ module.exports.run = async function(req, res) {
     // LOGIN TRADING
     await loginTrading(res, browser, page, URL_runningTrade, pin);
 
-    // GET SETTING DATA
-    let settings = await getSettingData(user_id);
-    let lastInit = await getLastInitBuysSells(user_id);
-
     // GET SETTING DATA IF SELL BY TIME IS TRUE
+    let lastInit = await getLastInitBuysSells(user_id);
     if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
       settings = await getUpdateSettingData(pagePF, URL_protofolio, thisUser);
     }
 
-    let price_type = await settings.price_type;
     let level_per_stock = parseInt(await settings.level_per_stock);
-    let stock_value_string = await settings.stock_value;
-    let stock_value_data = await stock_value_string.split(",", 4);
     let dana_per_stock = await settings.dana_per_stock;
     let spreadPerLevel = await settings.spread_per_level;
     let profitPerLevel = await settings.profit_per_level;
@@ -165,7 +237,7 @@ module.exports.run = async function(req, res) {
           settings,
           price_type,
           level_per_stock,
-          stock_value_data,
+          stock_value_data, //DPRECATED
           dana_per_stock,
           robot_id,
           URL_protofolio,
@@ -173,7 +245,9 @@ module.exports.run = async function(req, res) {
           URL_accountinfo,
           spreadPerLevel,
           clValue,
-          profitPerLevel
+          profitPerLevel,
+          initBuyDataStock,
+          URL_runningTrade
         );
       }
     });
@@ -204,7 +278,7 @@ async function main(
   settings,
   price_type,
   level_per_stock,
-  stock_value_data,
+  stock_value_data, //DPRECATED
   dana_per_stock,
   robot_id,
   URL_protofolio,
@@ -212,7 +286,9 @@ async function main(
   URL_accountinfo,
   spreadPerLevel,
   clValue,
-  profitPerLevel
+  profitPerLevel,
+  initBuyDataStock,
+  URL_runningTrade
 ) {
   let mainExec = [];
 
@@ -222,10 +298,11 @@ async function main(
       page,
       price_type,
       level_per_stock,
-      stock_value_data,
+      stock_value_data, //DPRECATED
       dana_per_stock,
       spreadPerLevel,
-      robot_id
+      robot_id,
+      initBuyDataStock
     );
   } else {
     // AUTOMATION INITIATION BUY (is_sell_by_time == false)
@@ -233,23 +310,22 @@ async function main(
       page,
       price_type,
       level_per_stock,
-      stock_value_data,
+      stock_value_data, //DPRECATED
       dana_per_stock,
       spreadPerLevel,
       user_id,
-      robot_id
+      robot_id,
+      initBuyDataStock
     );
   }
 
   console.log(
-    moment().format("HH:mm:ss") +
-      " main Robot " +
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
       robot_id +
-      " : thisInitBuy = ",
+      " : main thisInitBuy = ",
     thisInitBuy
   );
-
-  return;
 
   mainExec[1] = await page.waitFor(5000);
   // AUTOMATION
@@ -269,12 +345,16 @@ async function main(
     URL_accountinfo,
     clValue,
     profitPerLevel,
-    spreadPerLevel
+    spreadPerLevel,
+    URL_runningTrade
   );
 
   Promise.all(mainExec).then(() => {
     console.log(
-      "Robot " + robot_id + " : automationInitBuys automation finish!!!"
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : automationInitBuys automation finish!!!"
     );
   });
 
@@ -303,13 +383,14 @@ async function automation(
   URL_accountinfo,
   clValue,
   profitPerLevel,
-  spreadPerLevel
+  spreadPerLevel,
+  URL_runningTrade
 ) {
   console.log(
-    moment().format("HH:mm:ss") +
-      " automation Robot " +
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
       robot_id +
-      " : thisInitBuy = ",
+      " : automation thisInitBuy = ",
     thisInitBuy
   );
 
@@ -343,13 +424,14 @@ async function automation(
       }
 
       await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
+      await page.waitFor(5000);
       await inputStockRangking(pageSR);
 
       console.log(
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " : globalIndex = ",
+          " : Secondary job globalIndex = ",
         globalIndex
       );
       globalIndex++;
@@ -382,6 +464,11 @@ async function automation(
         let openStockSell = transaction.openStockSell;
 
         let openStock = transaction.openStock;
+
+        // REFRESH PAGE
+        if (matchStockBuy.length == 0 && matchStockSell.length == 0) {
+          await page.goto(URL_runningTrade);
+        }
 
         // AUTOMATION SELL
         if (matchStockBuy.length > 0) {
@@ -510,7 +597,10 @@ async function automation(
         }
 
         console.log(
-          "Robot " + robot_id + " : main job globalIndex = ",
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Main job globalIndex = ",
           globalIndex
         );
         globalIndex++;
@@ -576,20 +666,21 @@ async function automationInitBuys(
   page,
   price_type,
   level_per_stock,
-  stock_value_data,
+  stock_value_data, //DPRECATED
   dana_per_stock,
   spreadPerLevel,
-  robot_id
+  robot_id,
+  initBuyDataStock
 ) {
   let stocksInitBuy = [];
-  for (let i = 0; i < stock_value_data.length; i++) {
+  for (let i = 0; i < initBuyDataStock.length; i++) {
     for (let idx = 0; idx < level_per_stock; idx++) {
       stocksInitBuy.push(
         await stockInitBuy(
           page,
           price_type,
           level_per_stock,
-          stock_value_data[i],
+          initBuyDataStock[i],
           dana_per_stock,
           idx,
           spreadPerLevel,
@@ -615,11 +706,12 @@ async function automationInitBuysSellTimeFalse(
   page,
   price_type,
   level_per_stock,
-  stock_value_data,
+  stock_value_data, //DPRECATED
   dana_per_stock,
   spreadPerLevel,
   user_id,
-  robot_id
+  robot_id,
+  initBuyDataStock
 ) {
   let lastInit = await getLastInitBuysSells(user_id);
   let stocksInitSell = [];
@@ -639,14 +731,14 @@ async function automationInitBuysSellTimeFalse(
       }
     }
   } else {
-    for (let i = 0; i < stock_value_data.length; i++) {
+    for (let i = 0; i < initBuyDataStock.length; i++) {
       for (let idx = 0; idx < level_per_stock; idx++) {
         stocksInitBuy.push(
           await stockInitBuy(
             page,
             price_type,
             level_per_stock,
-            stock_value_data[i],
+            initBuyDataStock[i],
             dana_per_stock,
             idx,
             spreadPerLevel,
@@ -1075,7 +1167,7 @@ async function stockInitBuy(
   page,
   price_type,
   level,
-  stock,
+  initBuyDataStock,
   dana_per_stock,
   i,
   spreadPerLevel,
@@ -1084,17 +1176,25 @@ async function stockInitBuy(
   const URL_orderpad_buy =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
+  let stock = initBuyDataStock.stock;
+  let priceData = initBuyDataStock.price;
+
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : stock ",
     stock
   );
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : price_type ",
+    price_type
+  );
   await page.goto(URL_orderpad_buy);
   await page.type("input[id='_stockCode']", stock);
-  await page.keyboard.press(String.fromCharCode(13));
-  await page.waitFor(4000);
 
   let stockBudget = dana_per_stock;
-  let price = await getBuyPrice(page, price_type, level, spreadPerLevel);
+  let price = await getBuyPrice(level, spreadPerLevel, priceData);
   let lot = await getLot(stockBudget, level, price[i], robot_id);
 
   console.log(
@@ -1864,17 +1964,10 @@ async function getBidPrice(page) {
 }
 
 // get spesify buy price (sell by time == true)
-async function getBuyPrice(page, price_type, level, spreadPerLevel) {
-  let price;
+async function getBuyPrice(level, spreadPerLevel, priceData) {
+  let price = priceData;
   let dataPrice = [];
   let spread = 0;
-  if (price_type == "open") {
-    price = await getOpenPrice(page);
-  } else if (price_type == "prev") {
-    price = await getPrevClosePrice(page);
-  } else {
-    price = await getClosePrice(page);
-  }
 
   dataPrice[0] = parseInt(await price);
   // spread price by level per stock
@@ -1901,27 +1994,6 @@ async function getSpread(dataPrice, spreadPerLevel) {
   spread = Math.round(dataPrice * (spl / 100));
 
   return spread;
-}
-
-// get open price
-async function getOpenPrice(page) {
-  return await page.evaluate(
-    () => document.querySelector("span[id='_open']").innerHTML
-  );
-}
-
-// get prev close price
-async function getPrevClosePrice(page) {
-  return await page.evaluate(
-    () => document.querySelector("span[id='_prev']").innerHTML
-  );
-}
-
-// get close price
-async function getClosePrice(page) {
-  return await page.evaluate(
-    () => document.querySelector("td[id='_last']").innerHTML
-  );
 }
 
 // get lot
@@ -2163,35 +2235,6 @@ async function setRobotStatusInitFail(robot_id, message) {
   [err, robot] = await to(Robot.findOne({ where: { id: robot_id } }));
   robot.set(data);
   [err, robot] = await to(robot.save());
-}
-
-// get data sell time transaction now
-async function getSellTimeData(user_id) {
-  let err, sellTime;
-  let trxNow = moment().format("YYYY-MM-DD");
-  let nowSellTime = [];
-
-  [err, sellTime] = await to(
-    Sell_Times.findAll({ where: { user_id: user_id } })
-  );
-
-  if (sellTime.length > 0) {
-    nowSellTime = sellTime.filter(el => {
-      let createdAt = moment(el.createdAt).format("YYYY-MM-DD");
-
-      return trxNow == createdAt;
-    });
-
-    if (nowSellTime.length == 0) {
-      let data = {
-        user_id: user_id,
-        on_sell_by_time: "yes"
-      };
-      [err, sellTime] = await to(Sell_Times.create(data));
-    }
-  }
-
-  return nowSellTime;
 }
 
 // exec withdraw
