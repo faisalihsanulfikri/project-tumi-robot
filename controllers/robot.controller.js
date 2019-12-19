@@ -24,6 +24,10 @@ const CronJob = require("cron").CronJob;
 require("dotenv").config();
 
 let globalIndex = 0;
+let secondaryP_GlobalIndex = 0;
+let secondarySR_GlobalIndex = 0;
+let secondaryW_GlobalIndex = 0;
+
 let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
 let thisInitBuy = true;
 
@@ -196,7 +200,138 @@ module.exports.run = async function(req, res) {
 
     /** START */
 
-    // validate buy time
+    /**
+     *  SECONDARY JOB
+     *  Integrate Portfolio
+     */
+    const jobSecondaryP = new CronJob("*/120 * * * * *", async function() {
+      // INNITIATION
+      settings = await getSettingData(user_id);
+      let now = moment().format("HH:mm:ss");
+      let is_sell_by_time = settings.is_sell_by_time;
+      let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+      let sell_time = moment(getSellTime).format("HH:mm:ss");
+      let getCloseTime = moment("16:15:00", "HH:mm:ss");
+      let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+      // SELL BY TIME (ON)
+      if (is_sell_by_time == "true") {
+        if (now >= sell_time) {
+          console.log("jobSecondaryP.stop()");
+          jobSecondaryP.stop();
+        }
+      } else {
+        // SELL BY TIME (OFF)
+        // TURN OFF ROBOT
+        if (now >= closeTime) {
+          console.log("jobSecondaryP.stop()");
+          jobSecondaryP.stop();
+        }
+      }
+
+      await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
+      await page.waitFor(5000);
+
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : Secondary job PortFolio = ",
+        secondaryP_GlobalIndex
+      );
+      secondaryP_GlobalIndex++;
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Stock Ranking
+     */
+    const jobSecondarySR = new CronJob("*/120 * * * * *", async function() {
+      // INNITIATION
+      settings = await getSettingData(user_id);
+      let now = moment().format("HH:mm:ss");
+      let is_sell_by_time = settings.is_sell_by_time;
+      let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+      let sell_time = moment(getSellTime).format("HH:mm:ss");
+      let getCloseTime = moment("16:15:00", "HH:mm:ss");
+      let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+      // SELL BY TIME (ON)
+      if (is_sell_by_time == "true") {
+        if (now >= sell_time) {
+          console.log("jobSecondarySR.stop()");
+
+          jobSecondarySR.stop();
+        }
+      } else {
+        // SELL BY TIME (OFF)
+        // TURN OFF ROBOT
+        if (now >= closeTime) {
+          console.log("jobSecondarySR.stop()");
+          jobSecondarySR.stop();
+        }
+      }
+
+      await inputStockRangking(pageSR);
+      await page.waitFor(5000);
+
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : Secondary job Stock Ranking = ",
+        secondarySR_GlobalIndex
+      );
+      secondarySR_GlobalIndex++;
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Withdraws
+     */
+    const jobSecondaryW = new CronJob("*/120 * * * * *", async function() {
+      // INNITIATION
+      settings = await getSettingData(user_id);
+      let now = moment().format("HH:mm:ss");
+      let is_sell_by_time = settings.is_sell_by_time;
+      let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+      let sell_time = moment(getSellTime).format("HH:mm:ss");
+      let getCloseTime = moment("16:15:00", "HH:mm:ss");
+      let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+      // SELL BY TIME (ON)
+      if (is_sell_by_time == "true") {
+        if (now >= sell_time) {
+          console.log("jobSecondaryW.stop()");
+          jobSecondaryW.stop();
+        }
+      } else {
+        // SELL BY TIME (OFF)
+        // TURN OFF ROBOT
+        if (now >= closeTime) {
+          console.log("jobSecondaryW.stop()");
+          jobSecondaryW.stop();
+        }
+      }
+
+      await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
+      await page.waitFor(5000);
+
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : Secondary job Withdraws = ",
+        secondaryW_GlobalIndex
+      );
+      secondaryW_GlobalIndex++;
+    });
+
+    /**
+     *  VALIDATE INITIATION BUY TIME
+     *
+     *  transaction cycle will run after initiation buy
+     */
     const isMoreThanBuyTime = new CronJob("*/30 * * * * *", async function() {
       let now = moment().format("HH:mm:ss");
       let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
@@ -260,6 +395,9 @@ module.exports.run = async function(req, res) {
       }
     });
 
+    jobSecondaryP.start();
+    jobSecondarySR.start();
+    jobSecondaryW.start();
     isMoreThanBuyTime.start();
 
     /** END */
@@ -380,15 +518,15 @@ async function automation(
   page,
   pageTrx,
   pagePF,
-  pageSR,
-  pageWd,
+  pageSR, //DEPRECATED
+  pageWd, //DEPRECATED
   browser,
   user_id,
   settings,
   robot_id,
   URL_protofolio,
-  thisUser,
-  URL_accountinfo,
+  thisUser, //DEPRECATED
+  URL_accountinfo, //DEPRECATED
   clValue,
   profitPerLevel,
   spreadPerLevel,
@@ -404,47 +542,6 @@ async function automation(
 
   // initiation buy success
   if (thisInitBuy == true) {
-    // secondary job
-    const jobSecondary = new CronJob("*/120 * * * * *", async function() {
-      // INNITIATION
-      settings = await getSettingData(user_id);
-      let now = moment().format("HH:mm:ss");
-      let is_sell_by_time = settings.is_sell_by_time;
-      let getSellTime = moment(settings.cl_time, "HH:mm:ss");
-      let sell_time = moment(getSellTime).format("HH:mm:ss");
-      let getCloseTime = moment("16:15:00", "HH:mm:ss");
-      let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-      await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
-      await page.waitFor(5000);
-
-      // SELL BY TIME (ON)
-      if (is_sell_by_time == "true") {
-        if (now >= sell_time) {
-          jobSecondary.stop();
-        }
-      } else {
-        // SELL BY TIME (OFF)
-        // TURN OFF ROBOT
-        if (now >= closeTime) {
-          jobSecondary.stop();
-        }
-      }
-
-      await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
-      await page.waitFor(5000);
-      await inputStockRangking(pageSR);
-
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : Secondary job globalIndex = ",
-        globalIndex
-      );
-      globalIndex++;
-    });
-
     // main job
     const job = new CronJob("*/120 * * * * *", async function() {
       try {
@@ -614,13 +711,11 @@ async function automation(
         globalIndex++;
       } catch (error) {
         job.stop();
-        jobSecondary.stop();
         await closeErrorRobot(res, browser, thisMessage, robot_id);
       }
     });
 
     job.start();
-    jobSecondary.start();
   } else {
     // initiation buy failed
     console.log(
@@ -1037,7 +1132,10 @@ async function automationSetWithdrawRhb(
 
   dataDB[0] = getWithdrawData(user_id);
   dataDB[1] = console.log(
-    "Robot " + robot_id + " : getWithdrawData",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : getWithdrawData",
     await dataDB[0]
   );
   dataDB[2] = await pageWd.waitFor(2000);
@@ -1054,7 +1152,10 @@ async function automationSetWithdrawRhb(
   let requrstWithdraw = await dataDB[0];
 
   console.log(
-    "Robot " + robot_id + " : requrstWithdraw",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : requrstWithdraw",
     await requrstWithdraw.length
   );
 
@@ -2269,9 +2370,44 @@ async function withdraws(pageWd, URL_accountinfo, robot_id, user_id) {
   });
 }
 
+// set withdraw data
+async function setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id) {
+  let dataGetWistdraw = await getWithdrawRhb(pageWd, URL_accountinfo, robot_id);
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : dataGetWistdraw = ",
+    await dataGetWistdraw
+  );
+
+  await pageWd.waitFor(3000);
+
+  if (dataGetWistdraw.length > 0) {
+    let dataWithdraw = await setObjectDataWithdraw(dataGetWistdraw, user_id);
+
+    await pageWd.waitFor(3000);
+    let uWithdraw, err;
+
+    dataWithdraw.forEach(async el => {
+      [err, uWithdraw] = await to(
+        User_Withdraw.findOne({
+          where: { reference_no: el.reference_no }
+        })
+      );
+      if (!uWithdraw) {
+        [err, uWithdraw] = await to(User_Withdraw.create(el));
+      } else {
+        uWithdraw.set(el);
+        [err, uWithdraw] = await to(uWithdraw.save());
+      }
+    });
+  }
+}
+
 // get withdraw data
 async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
-  const data = [];
   let now = moment()
     .subtract(1, "months")
     .format("MM/01/YYYY");
@@ -2279,13 +2415,12 @@ async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
   await page.waitFor(3000);
 
   await page.type("input[id='date-from']", now);
-  await page.waitFor(1000);
+  // await page.waitFor(1000);
   await page.click("button[onclick='loadWithdrawList();']");
-  await page.waitFor(1000);
+  await page.waitFor(5000);
 
   try {
-    await page.waitFor(1000);
-    data = await page.evaluate(() => {
+    const data = await page.evaluate(() => {
       return new Promise((resolve, reject) => {
         let table = document.querySelector("#_requestTable");
         let row = table.children;
@@ -2309,7 +2444,16 @@ async function getWithdrawRhb(page, URL_accountinfo, robot_id) {
         resolve(items);
       });
     });
-    return data;
+
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : getWithdrawRhb",
+      await data
+    );
+
+    return (await data) || [];
   } catch (err) {
     console.log(
       moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -2364,34 +2508,6 @@ async function setObjectDataWithdraw(dataGetWistdraw, user_id) {
   });
 
   return dataWithdraw;
-}
-
-// set withdraw data
-async function setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id) {
-  let dataGetWistdraw = await getWithdrawRhb(pageWd, URL_accountinfo, robot_id);
-
-  await pageWd.waitFor(3000);
-
-  if (dataGetWistdraw.length > 0) {
-    let dataWithdraw = await setObjectDataWithdraw(dataGetWistdraw, user_id);
-
-    await pageWd.waitFor(3000);
-    let uWithdraw, err;
-
-    dataWithdraw.forEach(async el => {
-      [err, uWithdraw] = await to(
-        User_Withdraw.findOne({
-          where: { reference_no: el.reference_no }
-        })
-      );
-      if (!uWithdraw) {
-        [err, uWithdraw] = await to(User_Withdraw.create(el));
-      } else {
-        uWithdraw.set(el);
-        [err, uWithdraw] = await to(uWithdraw.save());
-      }
-    });
-  }
 }
 
 // get withdraw data
