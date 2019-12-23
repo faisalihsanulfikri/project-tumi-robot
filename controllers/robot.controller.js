@@ -784,7 +784,7 @@ async function automation(
   } else {
     // initiation buy failed
     console.log(
-      moment().format("HH:mm:ss") +
+      moment().format("YYYY-MM-DD HH:mm:ss") +
         " Robot " +
         robot_id +
         " : initiation buy failed"
@@ -920,7 +920,7 @@ async function automationInitBuysSellTimeFalse(
   // run initiation buy stock
   Promise.all(stocksInitSell).then(() => {
     console.log(
-      moment().format("HH:mm:ss") +
+      moment().format("YYYY-MM-DD HH:mm:ss") +
         " Robot " +
         robot_id +
         " : finish initiation sell (sell by time off) !!!"
@@ -930,7 +930,7 @@ async function automationInitBuysSellTimeFalse(
   // run initiation buy stock
   Promise.all(stocksInitBuy).then(() => {
     console.log(
-      moment().format("HH:mm:ss") +
+      moment().format("YYYY-MM-DD HH:mm:ss") +
         " Robot " +
         robot_id +
         " : finish initiation buy (sell by time off) !!!"
@@ -1396,8 +1396,9 @@ async function stockInitBuy(
       );
     }
   } else {
+    /** DEPRECATED */
     // trigger error initiation buy
-    thisInitBuy = false;
+    // thisInitBuy = false;
   }
 
   console.log(
