@@ -1,15 +1,14 @@
 "use strict";
 module.exports = (sequelize, DataTypes) => {
   var Model = sequelize.define(
-    "Init_Buy",
+    "Check_Init_Buy",
     {
       user_id: DataTypes.INTEGER,
       order_date: DataTypes.DATE,
       stock: DataTypes.STRING,
-      price: DataTypes.INTEGER,
       mode: DataTypes.STRING,
+      price: DataTypes.INTEGER,
       lots: DataTypes.INTEGER,
-      order_id: DataTypes.STRING,
       on_submit: {
         type: DataTypes.ENUM,
         values: ["yes", "no"],
@@ -17,8 +16,8 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     {
-      reezeTableName: true,
-      tableName: "init_buys"
+      freezeTableName: true,
+      tableName: "check_init_buys"
     }
   );
 
