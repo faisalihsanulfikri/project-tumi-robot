@@ -139,9 +139,8 @@ module.exports.portofolio = async function(req,res){
       resolve(items)
     })
   })
-  const data = item.concat(table)
 
-    return data
+  return { item, table };
 };
 
 async function getUsers() {
@@ -226,18 +225,70 @@ module.exports.inputPortofolio = async function(req, res){
 
       let user_id = thisUser.user_id;
 
-    getPortofolio.forEach(async el => {
-      [err, portofolio] = await to(Portofolio.findOne({ where: { user_id: user_id } }));
-      // console.log(stock.dataValues.id)
-        el.user_id = user_id;
-      if(!portofolio){
-          [err, portofolio] = await to(Portofolio.create(el));
-      }else {
-        portofolio.set(el);
-          [err, portofolio] = await to(portofolio.save());
-      }
+      let getPortofolio = "&nbsp";
+
+      let exec = true;
+
+      getPortofolio.item.forEach(async el => {        
+        if (el == "&nbsp") {
+          exec = false;
+        }
+      });
+      
+
+      if (exec == true) {
         
-    });
+        getPortofolio.item.forEach(async el => {
+          [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
+          
+          // if (el != "&nbsp") {
+            
+            el.user_id = user_id;
+            if (!portofolios) {
+              [err, portofolios] = await to(Portofolios.create(el));
+              lastinsertId = portofolios.dataValues.id;
+              // if (err) return ReE(res, err, 422);
+            } else {
+              portofolios.set(el);
+              [err, portofolios] = await to(portofolios.save());
+              lastinsertId = portofolios.dataValues.id;
+    
+            }
+          // }
+        });
+      
+        await pagePF.waitFor(2000);
+      
+        getPortofolio.table.forEach(async el => {
+          [err, portofolio_stock] = await to(
+            Portofolio_stocks.findOne({ where: { user_id: user_id } })
+          );
+      
+          el.portofolio_id = lastinsertId;
+          el.user_id = user_id;
+  
+            
+            if (!portofolio_stock) {
+              [err, portofolio_stock] = await to(Portofolio_stocks.create(el));
+            } else {
+              Promise.all([
+                ([err, portofolio_stock] = await to(
+                  Portofolio_stocks.findAll({ where: { user_id: user_id } })
+                )),
+                portofolio_stock.forEach(async element => {
+                  if (element) {
+                    ([err, portofolio_stock] = await to(
+                      Portofolio_stocks.findOne({ where: { id: element.id } })
+                    )),
+                      ([err, portofolio_stock] = await to(element.destroy()));
+                  }
+                })
+              ])[(err, portofolio_stock)] = await to(Portofolio_stocks.create(el));
+            }
+      
+        });
+      }
+      
 
     return ReS(res, { message: "Berhasil Input Portofilio" },201  );
 
