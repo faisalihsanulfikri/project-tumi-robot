@@ -940,6 +940,12 @@ async function automation(
               " : closeTime = ",
             closeTime
           );
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Sell by time off trigger"
+          );
           // SELL BY TIME (OFF)
           await sellByTimeOffTrigger(
             page,
@@ -1497,10 +1503,33 @@ async function sellByTimeOffTrigger(
     mapStockOpen.forEach((el, i) => {
       let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
       let price = parseInt(el.price);
+      let condition = "";
 
       el.last = parseInt(dataLast[0].last);
       el.cl = Math.round(price - (price * clValue) / 100);
       el.tp = Math.round(price + (price * profitPerLevel) / 100);
+
+      if (el.tp >= el.last) {
+        condition = "TARGET PROFIT";
+      } else if (el.cl < el.last) {
+        condition = "CUT LOST";
+      }
+
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : Stock " +
+          el.stock +
+          " | last : " +
+          el.last +
+          " | tp : " +
+          el.tp +
+          " | cl : " +
+          el.cl +
+          " | condition : " +
+          condition
+      );
     });
 
     // get tp or cl
@@ -2943,8 +2972,8 @@ async function getTpClStock(mapStockOpen, user_id) {
       });
     }
 
-    // cut lost <= last
-    if (el.cl <= el.last) {
+    // cut lost < last
+    if (el.cl < el.last) {
       dataMapStockOpen.push({
         order_id: el.order_id,
         user_id: user_id,
@@ -3027,8 +3056,13 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
         );
         [err, transaction] = await to(Transaction.create(el));
       } else {
-        transaction.set(el);
-        [err, transaction] = await to(transaction.save());
+        ([err, Datatransaction] = await to(
+          Transaction.findAll({ where: { user_id: el.user_id } })
+        )),
+          Datatransaction.forEach(async elements => {
+            [err, Datatransaction] = await to(elements.destroy());
+          });
+        [err, Datatransaction] = await to(Transaction.create(el));
       }
     });
 
