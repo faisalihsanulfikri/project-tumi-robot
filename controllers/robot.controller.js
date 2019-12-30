@@ -2824,7 +2824,7 @@ async function getPortofolioRhb(pagePF, URL_protofolio) {
         let result = {};
         const tr = row[i];
         const text = tr.children;
-        if (!text[i].textContent) {
+        if (!text[i]) {
         } else {
           result["stock"] = text[0].textContent;
           (result["avg_buy"] = text[1].textContent.replace(/,\s*/g, "")),
