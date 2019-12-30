@@ -1509,9 +1509,9 @@ async function sellByTimeOffTrigger(
       el.cl = Math.round(price - (price * clValue) / 100);
       el.tp = Math.round(price + (price * profitPerLevel) / 100);
 
-      if (el.tp >= el.last) {
+      if (el.last >= el.tp) {
         condition = "TARGET PROFIT";
-      } else if (el.cl < el.last) {
+      } else if (el.last < el.cl) {
         condition = "CUT LOST";
       }
 
@@ -2952,8 +2952,8 @@ async function getTpClStock(mapStockOpen, user_id) {
   let dataMapStockOpen = [];
 
   mapStockOpen.forEach((el, i) => {
-    // target profit >= last
-    if (el.tp >= el.last) {
+    // last >= target profit
+    if (el.last >= el.tp) {
       dataMapStockOpen.push({
         order_id: el.order_id,
         user_id: user_id,
@@ -2970,10 +2970,8 @@ async function getTpClStock(mapStockOpen, user_id) {
         createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
         updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
       });
-    }
-
-    // cut lost < last
-    if (el.cl < el.last) {
+    } else if (el.last < el.cl) {
+      // last < cut lost
       dataMapStockOpen.push({
         order_id: el.order_id,
         user_id: user_id,
