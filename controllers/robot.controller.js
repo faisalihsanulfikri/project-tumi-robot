@@ -1509,29 +1509,33 @@ async function sellByTimeOffTrigger(
       el.cl = Math.round(price - (price * clValue) / 100);
       el.tp = Math.round(price + (price * profitPerLevel) / 100);
 
-      if (el.last >= el.tp) {
-        condition = "TARGET PROFIT";
-      } else if (el.last < el.cl) {
-        condition = "CUT LOST";
-      }
+      if (el.mode == "Sell") {
+        // condition
+        if (el.last >= el.tp) {
+          condition = "TARGET PROFIT";
+        } else if (el.last < el.cl) {
+          condition = "CUT LOST";
+        }
 
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : Stock " +
-          el.stock +
-          " | price " +
-          el.price +
-          " | last : " +
-          el.last +
-          " | tp : " +
-          el.tp +
-          " | cl : " +
-          el.cl +
-          " | condition : " +
-          condition
-      );
+        // log detail price
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Stock " +
+            el.stock +
+            " | price " +
+            el.price +
+            " | last : " +
+            el.last +
+            " | tp : " +
+            el.tp +
+            " | cl : " +
+            el.cl +
+            " | condition : " +
+            condition
+        );
+      }
     });
 
     // get tp or cl
