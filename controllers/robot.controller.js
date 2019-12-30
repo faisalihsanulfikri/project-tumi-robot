@@ -30,6 +30,8 @@ let globalIndex = 0;
 let secondaryP_GlobalIndex = 0;
 let secondarySR_GlobalIndex = 0;
 let secondaryW_GlobalIndex = 0;
+let secondaryT_GlobalIndex = 0;
+let secondaryS_GlobalIndex = 0;
 
 let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
 let thisInitBuy = true;
@@ -37,6 +39,9 @@ let thisInitBuy = true;
 let runSecondaryJob = true;
 
 let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
+let is_sell_by_time = "";
+let getSellTime = "";
 
 // get data stock from google spreadsheet
 async function getStockFromSheet(stockModeId) {
@@ -367,7 +372,7 @@ module.exports.run = async function(req, res) {
      * OPEN RHB PAGE
      */
     const page = await browser.newPage();
-    // page transaction
+    // page trading exec
     const pageTrx = await browser.newPage();
     // page portfolio
     const pagePF = await browser.newPage();
@@ -375,6 +380,8 @@ module.exports.run = async function(req, res) {
     const pageSR = await browser.newPage();
     // page withdraws
     const pageWd = await browser.newPage();
+    // page transaction
+    const pageT = await browser.newPage();
 
     page.on("dialog", async dialog => {
       await dialog.accept();
@@ -389,6 +396,9 @@ module.exports.run = async function(req, res) {
       await dialog.accept();
     });
     pageWd.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageT.on("dialog", async dialog => {
       await dialog.accept();
     });
 
@@ -422,6 +432,9 @@ module.exports.run = async function(req, res) {
     let stock_value_data = await stock_value_string.split(",", 4);
     let stock_mode_id = await settings.stock_mode;
 
+    is_sell_by_time = settings.is_sell_by_time;
+    getSellTime = moment(settings.cl_time, "HH:mm:ss");
+
     /** TEST */
 
     /** END TEST */
@@ -430,17 +443,101 @@ module.exports.run = async function(req, res) {
 
     /**
      *  SECONDARY JOB
+     *  Settings
+     */
+    const jobSecondaryS = new CronJob("*/120 * * * * *", async function() {
+      if (runSecondaryJob) {
+        // INNITIATION
+        settings = await getSettingData(user_id);
+        is_sell_by_time = settings.is_sell_by_time;
+        getSellTime = moment(settings.cl_time, "HH:mm:ss");
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Secondary job Settings = ",
+          secondaryS_GlobalIndex
+        );
+        secondaryS_GlobalIndex++;
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Settings stop()"
+        );
+        jobSecondaryS.stop();
+      }
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Transaction
+     */
+    const jobSecondaryT = new CronJob("*/120 * * * * *", async function() {
+      if (runSecondaryJob) {
+        // INNITIATION
+        let now = moment().format("HH:mm:ss");
+        let sell_time = moment(getSellTime).format("HH:mm:ss");
+        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+        // SELL BY TIME (ON)
+        if (is_sell_by_time == "true") {
+          if (now >= sell_time) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Transaction stop()"
+            );
+            jobSecondaryT.stop();
+          }
+        } else {
+          // SELL BY TIME (OFF)
+          // TURN OFF ROBOT
+          if (now >= closeTime) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Transaction stop()"
+            );
+            jobSecondaryT.stop();
+          }
+        }
+
+        await automationTransaction(pageT, user_id, robot_id);
+        await page.waitFor(5000);
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Secondary job Transaction = ",
+          secondaryT_GlobalIndex
+        );
+        secondaryT_GlobalIndex++;
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Transaction stop()"
+        );
+        jobSecondaryT.stop();
+      }
+    });
+
+    /**
+     *  SECONDARY JOB
      *  Integrate Portfolio
      */
     const jobSecondaryP = new CronJob("*/120 * * * * *", async function() {
       if (runSecondaryJob) {
         // INNITIATION
-        settings = await getSettingData(user_id);
         let now = moment().format("HH:mm:ss");
-        let is_sell_by_time = settings.is_sell_by_time;
-        let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SELL BY TIME (ON)
@@ -497,12 +594,8 @@ module.exports.run = async function(req, res) {
     const jobSecondarySR = new CronJob("*/120 * * * * *", async function() {
       if (runSecondaryJob) {
         // INNITIATION
-        settings = await getSettingData(user_id);
         let now = moment().format("HH:mm:ss");
-        let is_sell_by_time = settings.is_sell_by_time;
-        let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SELL BY TIME (ON)
@@ -560,12 +653,8 @@ module.exports.run = async function(req, res) {
     const jobSecondaryW = new CronJob("*/120 * * * * *", async function() {
       if (runSecondaryJob) {
         // INNITIATION
-        settings = await getSettingData(user_id);
         let now = moment().format("HH:mm:ss");
-        let is_sell_by_time = settings.is_sell_by_time;
-        let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SELL BY TIME (ON)
@@ -690,6 +779,8 @@ module.exports.run = async function(req, res) {
       }
     });
 
+    jobSecondaryS.start();
+    jobSecondaryT.start();
     jobSecondaryP.start();
     jobSecondarySR.start();
     jobSecondaryW.start();
@@ -2953,6 +3044,38 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
   return await exec[0];
 }
 
+// automation transaction
+async function automationTransaction(pageT, user_id, robot_id) {
+  let getDataTransaction = await getTransaction(pageT);
+
+  await pageT.waitFor(5000);
+
+  if (getDataTransaction.length > 0) {
+    getDataTransaction.forEach(async el => {
+      el.user_id = user_id;
+      // set data
+      [err, transaction] = await to(
+        Transaction.findOne({ where: { order_id: el.order_id } })
+      );
+      if (!transaction) {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : ",
+          el
+        );
+        [err, transaction] = await to(Transaction.create(el));
+      } else {
+        ([err, Datatransaction] = await to(
+          Transaction.findAll({ where: { user_id: el.user_id } })
+        )),
+          Datatransaction.forEach(async elements => {
+            [err, Datatransaction] = await to(elements.destroy());
+          });
+        [err, Datatransaction] = await to(Transaction.create(el));
+      }
+    });
+  }
+}
+
 // get data if last more than tp or last less than cl
 async function getTpClStock(mapStockOpen, user_id) {
   let dataMapStockOpen = [];
@@ -3047,29 +3170,6 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
   let openStock = [];
 
   if (getDataTransaction.length > 0) {
-    getDataTransaction.forEach(async el => {
-      el.user_id = user_id;
-      // set data
-      [err, transaction] = await to(
-        Transaction.findOne({ where: { order_id: el.order_id } })
-      );
-      if (!transaction) {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : ",
-          el
-        );
-        [err, transaction] = await to(Transaction.create(el));
-      } else {
-        ([err, Datatransaction] = await to(
-          Transaction.findAll({ where: { user_id: el.user_id } })
-        )),
-          Datatransaction.forEach(async elements => {
-            [err, Datatransaction] = await to(elements.destroy());
-          });
-        [err, Datatransaction] = await to(Transaction.create(el));
-      }
-    });
-
     getDataTransaction.forEach(async (el, i) => {
       let spl = parseInt(spreadPerLevel);
       let spread = 0;
