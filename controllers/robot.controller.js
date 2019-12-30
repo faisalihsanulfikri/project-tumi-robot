@@ -2880,15 +2880,15 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
+    lastinsertId = portofolios.dataValues.id;
+
     el.user_id = user_id;
     if (!portofolios) {
       [err, portofolios] = await to(Portofolios.create(el));
-      lastinsertId = portofolios.dataValues.id;
       // if (err) return ReE(res, err, 422);
     } else {
       portofolios.set(el);
       [err, portofolios] = await to(portofolios.save());
-      lastinsertId = portofolios.dataValues.id;
       // if (err) return ReE(res, err, 422);
 
       //   }
