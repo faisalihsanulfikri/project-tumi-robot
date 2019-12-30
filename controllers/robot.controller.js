@@ -1521,6 +1521,8 @@ async function sellByTimeOffTrigger(
           robot_id +
           " : Stock " +
           el.stock +
+          " | price " +
+          el.price +
           " | last : " +
           el.last +
           " | tp : " +
