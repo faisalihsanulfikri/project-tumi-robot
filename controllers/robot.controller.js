@@ -36,6 +36,8 @@ let thisInitBuy = true;
 
 let runSecondaryJob = true;
 
+let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
 // get data stock from google spreadsheet
 async function getStockFromSheet(stockModeId) {
   let baseURL = process.env.API_URL;
@@ -263,7 +265,7 @@ async function getInitBuyStock(user_id) {
   return initBuyStock;
 }
 
-// update initiation buy data set on submit = yes
+// update initiation buy data set on submit = yes (sell buy time yes)
 async function updateInitData(user_id, stock, price, lots, mode) {
   let dataInit, err;
   let startDate = moment().format("YYYY-MM-DD 00:00:00");
@@ -296,6 +298,7 @@ async function updateInitData(user_id, stock, price, lots, mode) {
   }
 }
 
+// update initiation buy data set on submit = yes (sell buy time no)
 async function updateInitDataSellTimeOff(id, user_id) {
   let dataInit, err;
 
@@ -437,7 +440,7 @@ module.exports.run = async function(req, res) {
         let is_sell_by_time = settings.is_sell_by_time;
         let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SELL BY TIME (ON)
@@ -499,7 +502,7 @@ module.exports.run = async function(req, res) {
         let is_sell_by_time = settings.is_sell_by_time;
         let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SELL BY TIME (ON)
@@ -562,7 +565,7 @@ module.exports.run = async function(req, res) {
         let is_sell_by_time = settings.is_sell_by_time;
         let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SELL BY TIME (ON)
@@ -830,7 +833,7 @@ async function automation(
         let is_sell_by_time = settings.is_sell_by_time;
         let getSellTime = moment(settings.cl_time, "HH:mm:ss");
         let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
         let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
         // SET / UPDATE DATA TO TUMI DATABASE
@@ -1013,7 +1016,7 @@ async function automation(
     const jobFailInitBuy = new CronJob("*/120 * * * * *", async function() {
       // INNITIATION
       let now = moment().format("HH:mm:ss");
-      let getCloseTime = moment("16:15:00", "HH:mm:ss");
+
       let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
       // TURN OFF ROBOT
