@@ -1826,8 +1826,8 @@ async function stockSell(page, dataStockSell, robot_id) {
   const URL_orderpad_sell =
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?sell";
   let stock = dataStockSell.stock;
-  let priceSell = dataStockSell.priceSell;
-  let priceBuy = dataStockSell.priceBuy;
+  let priceSell = dataStockSell.priceSell.replace(",", "");
+  let priceBuy = dataStockSell.priceBuy.replace(",", "");
   let lots = dataStockSell.lots;
 
   console.log(
@@ -1988,8 +1988,8 @@ async function stockBuy(page, dataStockBuy, robot_id) {
     "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderpad.jsp?buy";
 
   let stock = dataStockBuy.stock;
-  let priceSell = dataStockBuy.priceSell;
-  let priceBuy = dataStockBuy.priceBuy;
+  let priceSell = dataStockBuy.priceSell.replace(",", "");
+  let priceBuy = dataStockBuy.priceBuy.replace(",", "");
   let lots = dataStockBuy.lots;
 
   console.log(
