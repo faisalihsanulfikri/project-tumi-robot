@@ -2278,6 +2278,8 @@ async function setStockSell(stockData, robot_id) {
 async function getStockSell(user_id) {
   let err, stockSell;
   let trxNow = moment().format("YYYY-MM-DD");
+  let startDate = moment().format("YYYY-MM-DD 00:00:00");
+  let EndDate = moment().format("YYYY-MM-DD 23:59:00");
 
   [err, stockSell] = await to(
     Stock_Sell.findAll({
@@ -2285,7 +2287,11 @@ async function getStockSell(user_id) {
         user_id: user_id,
         mode: "Buy",
         status: "Matched",
-        on_sale: "no"
+        on_sale: "no",
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lt]: EndDate
+        }
       }
     })
   );
@@ -2304,6 +2310,8 @@ async function getStockSell(user_id) {
 async function getStockSellByTime(user_id) {
   let err, stockSell;
   let trxNow = moment().format("YYYY-MM-DD");
+  let startDate = moment().format("YYYY-MM-DD 00:00:00");
+  let EndDate = moment().format("YYYY-MM-DD 23:59:00");
 
   [err, stockSell] = await to(
     Stock_Sell.findAll({
@@ -2311,7 +2319,11 @@ async function getStockSellByTime(user_id) {
         user_id: user_id,
         mode: "Sell",
         status: "open",
-        on_sale: "no"
+        on_sale: "no",
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lt]: EndDate
+        }
       }
     })
   );
@@ -2357,6 +2369,8 @@ async function getStockBuy(user_id) {
   let err, stockBuy;
 
   let trxNow = moment().format("YYYY-MM-DD");
+  let startDate = moment().format("YYYY-MM-DD 00:00:00");
+  let EndDate = moment().format("YYYY-MM-DD 23:59:00");
 
   [err, stockBuy] = await to(
     Stock_Sell.findAll({
@@ -2364,7 +2378,11 @@ async function getStockBuy(user_id) {
         user_id: user_id,
         mode: "Sell",
         status: "Matched",
-        on_sale: "no"
+        on_sale: "no",
+        createdAt: {
+          [Op.gte]: startDate,
+          [Op.lt]: EndDate
+        }
       }
     })
   );
