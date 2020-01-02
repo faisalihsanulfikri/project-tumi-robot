@@ -1594,7 +1594,7 @@ async function sellByTimeOffTrigger(
     mapStockOpen.forEach((el, i) => {
       let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
       let price = parseInt(el.price);
-      let condition = "";
+      let condition = "Normal";
 
       el.last = parseInt(dataLast[0].last);
       el.cl = Math.round(price - (price * clValue) / 100);
@@ -3047,7 +3047,10 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
   exec[0] = await getPortofolioRhb(pagePF, URL_protofolio);
   exec[1] = await pagePF.waitFor(1000);
   exec[2] = await console.log(
-    "Robot " + robot_id + " : portofolio",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " : Robot " +
+      robot_id +
+      " : portofolio",
     await exec[0]
   );
   exec[3] = await pagePF.waitFor(1000);
@@ -3055,7 +3058,10 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
 
   Promise.all(exec).then(() => {
     console.log(
-      "Robot " + robot_id + " : getPortofolioRhb setProtofolioData finish!!!"
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " : Robot " +
+        robot_id +
+        " : getPortofolioRhb setProtofolioData finish!!!"
     );
   });
 
