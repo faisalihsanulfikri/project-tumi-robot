@@ -3198,10 +3198,22 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
       let spl = parseInt(spreadPerLevel);
       let spread = 0;
 
-      spread = Math.round(el.price * (spl / 100));
+      let price = el.price.replace(",", "");
+
+      spread = Math.round(price * (spl / 100));
 
       if (el.status == "Open") {
-        openStock.push(el);
+        openStock.push({
+          order_id: el.order_id,
+          user_id: user_id,
+          stock: el.stock,
+          mode: el.mode,
+          lots: el.lots,
+          status: el.status,
+          price: price,
+          createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+        });
       }
 
       if (el.mode == "Buy") {
@@ -3212,8 +3224,8 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           mode: el.mode,
           lots: el.lots,
           status: el.status,
-          priceBuy: el.price,
-          priceSell: (parseInt(el.price) + spread).toString(),
+          priceBuy: price,
+          priceSell: (parseInt(price) + spread).toString(),
           createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
         });
@@ -3225,8 +3237,8 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           mode: el.mode,
           lots: el.lots,
           status: el.status,
-          priceBuy: (parseInt(el.price) - spread).toString(),
-          priceSell: el.price,
+          priceBuy: (parseInt(price) - spread).toString(),
+          priceSell: price,
           createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
         });
