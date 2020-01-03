@@ -456,6 +456,35 @@ module.exports.run = async function(req, res) {
         is_sell_by_time = settings.is_sell_by_time;
         getSellTime = moment(settings.cl_time, "HH:mm:ss");
 
+        let now = moment().format("HH:mm:ss");
+        let sell_time = moment(getSellTime).format("HH:mm:ss");
+        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+        // SELL BY TIME (ON)
+        if (is_sell_by_time == "true") {
+          if (now >= sell_time) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Settings stop()"
+            );
+            jobSecondaryS.stop();
+          }
+        } else {
+          // SELL BY TIME (OFF)
+          // TURN OFF ROBOT
+          if (now >= closeTime) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Settings stop()"
+            );
+            jobSecondaryS.stop();
+          }
+        }
+
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
             " Robot " +
