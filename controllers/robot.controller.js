@@ -1049,10 +1049,9 @@ async function automation(
               robot_id
             );
             execSellTimeTrue[1] = await page.waitFor(5000);
-            execSellTimeTrue[2] = await setTransactionData(
+            execSellTimeTrue[2] = await automationTransaction(
               pageTrx,
               user_id,
-              spreadPerLevel,
               robot_id
             );
             execSellTimeTrue[3] = await page.waitFor(5000);
@@ -1113,10 +1112,9 @@ async function automation(
 
             exec[0] = await setInitBuySell(page, user_id);
             exec[1] = await page.waitFor(5000);
-            exec[2] = await setTransactionData(
+            exec[2] = await automationTransaction(
               pageTrx,
               user_id,
-              spreadPerLevel,
               robot_id
             );
             exec[3] = await page.waitFor(5000);
@@ -3049,7 +3047,6 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
-    
     el.user_id = user_id;
     if (!portofolios) {
       [err, portofolios] = await to(Portofolios.create(el));
