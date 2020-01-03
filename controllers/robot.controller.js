@@ -38,7 +38,7 @@ let thisInitBuy = true;
 
 let runSecondaryJob = true;
 
-let getCloseTime = moment("16:15:00", "HH:mm:ss");
+let getCloseTime = moment("17:20:00", "HH:mm:ss");
 
 let is_sell_by_time = "";
 let getSellTime = "";
@@ -834,11 +834,11 @@ module.exports.run = async function(req, res) {
     });
 
     jobSecondaryS.start();
-    jobSecondaryT.start();
     jobSecondaryP.start();
     jobSecondarySR.start();
     jobSecondaryW.start();
-    isMoreThanBuyTime.start();
+    jobSecondaryT.start();
+    // isMoreThanBuyTime.start();
 
     /** END */
     return res.json({
@@ -3049,18 +3049,15 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
-    lastinsertId = portofolios.dataValues.id;
-
+    
     el.user_id = user_id;
     if (!portofolios) {
       [err, portofolios] = await to(Portofolios.create(el));
-      // if (err) return ReE(res, err, 422);
+      lastinsertId = portofolios.dataValues.id;
     } else {
       portofolios.set(el);
       [err, portofolios] = await to(portofolios.save());
-      // if (err) return ReE(res, err, 422);
-
-      //   }
+      lastinsertId = portofolios.dataValues.id;
     }
   });
 
