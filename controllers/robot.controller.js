@@ -838,7 +838,7 @@ module.exports.run = async function(req, res) {
     jobSecondarySR.start();
     jobSecondaryW.start();
     jobSecondaryT.start();
-    // isMoreThanBuyTime.start();
+    isMoreThanBuyTime.start();
 
     /** END */
     return res.json({
