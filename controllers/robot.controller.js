@@ -38,7 +38,7 @@ let thisInitBuy = true;
 
 let runSecondaryJob = true;
 
-let getCloseTime = moment("17:20:00", "HH:mm:ss");
+let getCloseTime = moment("16:15:00", "HH:mm:ss");
 
 let is_sell_by_time = "";
 let getSellTime = "";
