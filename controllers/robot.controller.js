@@ -432,6 +432,10 @@ module.exports.run = async function(req, res) {
     let stock_value_data = await stock_value_string.split(",", 4);
     let stock_mode_id = await settings.stock_mode;
 
+    if (stock_mode_id == "custom") {
+      stock_mode_id = "okjz6if";
+    }
+
     is_sell_by_time = settings.is_sell_by_time;
     getSellTime = moment(settings.cl_time, "HH:mm:ss");
 
@@ -477,47 +481,52 @@ module.exports.run = async function(req, res) {
      */
     const jobSecondaryT = new CronJob("*/120 * * * * *", async function() {
       if (runSecondaryJob) {
-        // INNITIATION
-        let now = moment().format("HH:mm:ss");
-        let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+        try {
+          // INNITIATION
+          let now = moment().format("HH:mm:ss");
+          let sell_time = moment(getSellTime).format("HH:mm:ss");
+          let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
-        // SELL BY TIME (ON)
-        if (is_sell_by_time == "true") {
-          if (now >= sell_time) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Transaction stop()"
-            );
-            jobSecondaryT.stop();
+          // SELL BY TIME (ON)
+          if (is_sell_by_time == "true") {
+            if (now >= sell_time) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Transaction stop()"
+              );
+              jobSecondaryT.stop();
+            }
+          } else {
+            // SELL BY TIME (OFF)
+            // TURN OFF ROBOT
+            if (now >= closeTime) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Transaction stop()"
+              );
+              jobSecondaryT.stop();
+            }
           }
-        } else {
-          // SELL BY TIME (OFF)
-          // TURN OFF ROBOT
-          if (now >= closeTime) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Transaction stop()"
-            );
-            jobSecondaryT.stop();
-          }
+
+          await automationTransaction(pageT, user_id, robot_id);
+          await page.waitFor(5000);
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Secondary job Transaction = ",
+            secondaryT_GlobalIndex
+          );
+          secondaryT_GlobalIndex++;
+        } catch (error) {
+          runSecondaryJob = false;
+          await closeErrorRobot(res, browser, thisMessage, robot_id);
         }
-
-        await automationTransaction(pageT, user_id, robot_id);
-        await page.waitFor(5000);
-
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : Secondary job Transaction = ",
-          secondaryT_GlobalIndex
-        );
-        secondaryT_GlobalIndex++;
       } else {
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -710,72 +719,88 @@ module.exports.run = async function(req, res) {
      *  transaction cycle will run after initiation buy
      */
     const isMoreThanBuyTime = new CronJob("*/30 * * * * *", async function() {
-      let now = moment().format("HH:mm:ss");
-      let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-      let buy_time = moment(getBuyTime).format("HH:mm:ss");
-
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : now",
-        now
-      );
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : buy_time",
-        buy_time
-      );
-
-      if (now >= buy_time) {
-        isMoreThanBuyTime.stop();
-        let initBuyDataStock = await getInitBuyDataStock(
-          price_type,
-          stock_value_data,
-          stock_mode_id
-        );
+      if (runSecondaryJob) {
+        let now = moment().format("HH:mm:ss");
+        let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+        let buy_time = moment(getBuyTime).format("HH:mm:ss");
 
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
             " Robot " +
             robot_id +
-            " : isMoreThanBuyTime",
-          initBuyDataStock
+            " : now",
+          now
+        );
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : buy_time",
+          buy_time
         );
 
-        let dataInitBuyStock = await setInitBuyStock(
-          initBuyDataStock,
-          user_id,
-          dana_per_stock,
-          level_per_stock,
-          spreadPerLevel,
-          robot_id
-        );
+        if (now >= buy_time) {
+          isMoreThanBuyTime.stop();
 
-        console.log("dataInitBuyStock = ", dataInitBuyStock);
+          // get all stock for custom
+          if (stock_mode_id == "custom") {
+            stock_mode_id = "okjz6if";
+          }
 
-        await main(
-          res,
-          page,
-          pageTrx,
-          pagePF,
-          pageSR,
-          pageWd,
-          browser,
-          user_id,
-          settings,
-          robot_id,
-          URL_protofolio,
-          thisUser,
-          URL_accountinfo,
-          spreadPerLevel,
-          clValue,
-          profitPerLevel,
-          dataInitBuyStock,
-          URL_runningTrade
+          let initBuyDataStock = await getInitBuyDataStock(
+            price_type,
+            stock_value_data,
+            stock_mode_id
+          );
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : isMoreThanBuyTime",
+            initBuyDataStock
+          );
+
+          let dataInitBuyStock = await setInitBuyStock(
+            initBuyDataStock,
+            user_id,
+            dana_per_stock,
+            level_per_stock,
+            spreadPerLevel,
+            robot_id
+          );
+
+          console.log("dataInitBuyStock = ", dataInitBuyStock);
+
+          await main(
+            res,
+            page,
+            pageTrx,
+            pagePF,
+            pageSR,
+            pageWd,
+            browser,
+            user_id,
+            settings,
+            robot_id,
+            URL_protofolio,
+            thisUser,
+            URL_accountinfo,
+            spreadPerLevel,
+            clValue,
+            profitPerLevel,
+            dataInitBuyStock,
+            URL_runningTrade
+          );
+        }
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary isMoreThanBuyTime stop()"
         );
+        isMoreThanBuyTime.stop();
       }
     });
 
@@ -3088,12 +3113,16 @@ async function automationTransaction(pageT, user_id, robot_id) {
         );
         [err, transaction] = await to(Transaction.create(el));
       } else {
-        ([err, Datatransaction] = await to(
+        transaction.set(el);
+
+        [err, Datatransaction] = await to(
           Transaction.findAll({ where: { user_id: el.user_id } })
-        )),
-          Datatransaction.forEach(async elements => {
-            [err, Datatransaction] = await to(elements.destroy());
-          });
+        );
+
+        Datatransaction.forEach(async elements => {
+          [err, Datatransaction] = await to(elements.destroy());
+        });
+
         [err, Datatransaction] = await to(Transaction.create(el));
       }
     });
