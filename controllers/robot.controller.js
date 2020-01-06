@@ -547,7 +547,7 @@ module.exports.run = async function(req, res) {
           }
 
           await automationTransaction(pageT, user_id, robot_id);
-          await page.waitFor(5000);
+          await pageT.waitFor(5000);
 
           console.log(
             moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -610,7 +610,7 @@ module.exports.run = async function(req, res) {
         }
 
         await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
-        await page.waitFor(5000);
+        await pagePF.waitFor(5000);
 
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -669,7 +669,7 @@ module.exports.run = async function(req, res) {
         }
 
         await inputStockRangking(pageSR);
-        await page.waitFor(5000);
+        await pageSR.waitFor(5000);
 
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -727,7 +727,7 @@ module.exports.run = async function(req, res) {
         }
 
         await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
-        await page.waitFor(5000);
+        await pageWd.waitFor(5000);
 
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
