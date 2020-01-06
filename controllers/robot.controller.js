@@ -73,7 +73,8 @@ async function getStockFromSheet(stockModeId) {
 async function getInitBuyDataStock(
   price_type,
   stock_value_data,
-  stock_mode_id
+  stock_mode_id,
+  robot_id
 ) {
   let stockFromSheet = await getStockFromSheet(stock_mode_id);
 
@@ -107,7 +108,10 @@ async function getInitBuyDataStock(
   });
 
   console.log(
-    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot XXX : initBuyDataStock",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : initBuyDataStock",
     initBuyDataStock
   );
 
@@ -148,11 +152,12 @@ async function setInitBuyStock(
   let insertStockToDb = [];
 
   for (let i = 0; i < initBuyDataStock.length; i++) {
-    for (let idx = 0; idx < level; idx++) {
-      let stock = initBuyDataStock[i].stock;
-      let priceData = initBuyDataStock[i].price;
+    let stock = initBuyDataStock[i].stock;
+    let priceData = initBuyDataStock[i].price;
 
-      let price = await getBuyPrice(level, spreadPerLevel, priceData);
+    let price = await getBuyPrice(level, spreadPerLevel, priceData);
+
+    for (let idx = 0; idx < level; idx++) {
       let lots = await getLot(stockBudget, level, price[idx], robot_id);
 
       insertStockToDb.push({
@@ -779,7 +784,8 @@ module.exports.run = async function(req, res) {
           let initBuyDataStock = await getInitBuyDataStock(
             price_type,
             stock_value_data,
-            stock_mode_id
+            stock_mode_id,
+            robot_id
           );
 
           console.log(
@@ -1112,11 +1118,7 @@ async function automation(
 
             exec[0] = await setInitBuySell(page, user_id);
             exec[1] = await page.waitFor(5000);
-            exec[2] = await automationTransaction(
-              pageTrx,
-              user_id,
-              robot_id
-            );
+            exec[2] = await automationTransaction(pageTrx, user_id, robot_id);
             exec[3] = await page.waitFor(5000);
             exec[4] = await setOffRobotStatus(robot_id, thisMessage);
             exec[5] = await page.waitFor(5000);
@@ -2527,10 +2529,29 @@ async function getBuyPrice(level, spreadPerLevel, priceData) {
 // get spread price
 async function getSpread(dataPrice, spreadPerLevel) {
   // spread per level
-  let spl = parseInt(await spreadPerLevel);
+  let spl = parseInt(await spreadPerLevel); //DEPRECATED
   let spread = 0;
+  let price = parseInt(dataPrice);
 
-  spread = Math.round(dataPrice * (spl / 100));
+  if (price < 200) {
+    spread = 1;
+  }
+
+  if (price >= 200 && price < 500) {
+    spread = 2;
+  }
+
+  if (price >= 500 && price < 2000) {
+    spread = 5;
+  }
+
+  if (price >= 2000 && price < 5000) {
+    spread = 10;
+  }
+
+  if (price >= 5000) {
+    spread = 25;
+  }
 
   return spread;
 }
@@ -2549,9 +2570,7 @@ async function getLot(stockBudget, level, price, robot_id) {
     }
   );
 
-  return Math.round(
-    parseInt(stockBudget) / level / parseInt(price) / 100
-  ).toString();
+  return Math.round(parseInt(stockBudget) / parseInt(price) / 100).toString();
 }
 
 // login
