@@ -558,8 +558,9 @@ module.exports.run = async function(req, res) {
           );
           secondaryT_GlobalIndex++;
         } catch (error) {
+          let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+          await closeErrorRobot(res, browser, msg, robot_id);
           runSecondaryJob = false;
-          await closeErrorRobot(res, browser, thisMessage, robot_id);
         }
       } else {
         console.log(
