@@ -3138,6 +3138,18 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
 
 // automation transaction
 async function automationTransaction(pageT, user_id, robot_id) {
+  [err, Datatransaction] = await to(
+    Transaction.findAll({ where: { user_id: user_id } })
+  );
+
+  if (Datatransaction.length > 0) {
+    Datatransaction.forEach(async elements => {
+      [err, Datatransaction] = await to(elements.destroy());
+    });
+  }
+
+  await pageT.waitFor(3000);
+
   let getDataTransaction = await getTransaction(pageT);
 
   await pageT.waitFor(5000);
@@ -3145,29 +3157,14 @@ async function automationTransaction(pageT, user_id, robot_id) {
   if (getDataTransaction.length > 0) {
     getDataTransaction.forEach(async el => {
       el.user_id = user_id;
-      // set data
-      [err, transaction] = await to(
-        Transaction.findOne({ where: { order_id: el.order_id } })
+      [err, transaction] = await to(Transaction.create(el));
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : Transaction Data",
+        el
       );
-      if (!transaction) {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : ",
-          el
-        );
-        [err, transaction] = await to(Transaction.create(el));
-      } else {
-        transaction.set(el);
-
-        [err, Datatransaction] = await to(
-          Transaction.findAll({ where: { user_id: el.user_id } })
-        );
-
-        Datatransaction.forEach(async elements => {
-          [err, Datatransaction] = await to(elements.destroy());
-        });
-
-        [err, Datatransaction] = await to(Transaction.create(el));
-      }
     });
   }
 }
