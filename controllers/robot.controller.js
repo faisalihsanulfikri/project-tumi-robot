@@ -90,19 +90,19 @@ async function getInitBuyDataStock(
       let price = "";
 
       if (price_type == "open") {
-        price = filterStockFromSheet[0].open;
+        price = filterStockFromSheet[0].open.replace(".", "");
       }
       if (price_type == "close") {
-        price = filterStockFromSheet[0].close;
+        price = filterStockFromSheet[0].close.replace(".", "");
       }
       if (price_type == "prev") {
-        price = filterStockFromSheet[0].prev_close;
+        price = filterStockFromSheet[0].prev_close.replace(".", "");
       }
 
       initBuyDataStock.push({
         stock,
         price_type,
-        price: price.replace(".", "")
+        price: price
       });
     }
   });
