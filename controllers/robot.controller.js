@@ -3109,6 +3109,8 @@ async function getPortofolioRhb(pagePF, URL_protofolio) {
 
 // set protofolio data
 async function setProtofolioData(pagePF, getPortofolio, user_id) {
+  let lastinsertId;
+
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
@@ -3183,23 +3185,23 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
 
 // automation transaction
 async function automationTransaction(pageT, user_id, robot_id) {
-  [err, Datatransaction] = await to(
-    Transaction.findAll({ where: { user_id: user_id } })
-  );
-
-  if (Datatransaction.length > 0) {
-    Datatransaction.forEach(async elements => {
-      [err, Datatransaction] = await to(elements.destroy());
-    });
-  }
-
-  await pageT.waitFor(3000);
-
   let getDataTransaction = await getTransaction(pageT);
 
   await pageT.waitFor(5000);
 
   if (getDataTransaction.length > 0) {
+    [err, Datatransaction] = await to(
+      Transaction.findAll({ where: { user_id: user_id } })
+    );
+
+    if (Datatransaction.length > 0) {
+      Datatransaction.forEach(async elements => {
+        [err, Datatransaction] = await to(elements.destroy());
+      });
+    }
+
+    await pageT.waitFor(3000);
+
     getDataTransaction.forEach(async el => {
       el.user_id = user_id;
       [err, transaction] = await to(Transaction.create(el));
