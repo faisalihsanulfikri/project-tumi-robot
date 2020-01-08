@@ -558,9 +558,14 @@ module.exports.run = async function(req, res) {
           );
           secondaryT_GlobalIndex++;
         } catch (error) {
-          let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
-          await closeErrorRobot(res, browser, msg, robot_id);
           runSecondaryJob = false;
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Error from Secondary Job()"
+          );
         }
       } else {
         console.log(
@@ -570,6 +575,9 @@ module.exports.run = async function(req, res) {
             " : runSecondaryJob jobSecondary Transaction stop()"
         );
         jobSecondaryT.stop();
+
+        let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+        await closeErrorRobot(res, browser, msg, robot_id);
       }
     });
 
@@ -978,177 +986,201 @@ async function automation(
   if (thisInitBuy == true) {
     // main job
     const job = new CronJob("*/120 * * * * *", async function() {
-      try {
-        // INNITIATION
-        settings = await getSettingData(user_id);
-        let now = moment().format("HH:mm:ss");
-        let is_sell_by_time = settings.is_sell_by_time;
-        let getSellTime = moment(settings.cl_time, "HH:mm:ss");
-        let sell_time = moment(getSellTime).format("HH:mm:ss");
+      /**
+       * trigger for MAIN JOB
+       * if SECONDARY JOB has error, MAIN JOB must stop()
+       */
+      if (runSecondaryJob) {
+        try {
+          // INNITIATION
+          settings = await getSettingData(user_id);
+          let now = moment().format("HH:mm:ss");
+          let is_sell_by_time = settings.is_sell_by_time;
+          let getSellTime = moment(settings.cl_time, "HH:mm:ss");
+          let sell_time = moment(getSellTime).format("HH:mm:ss");
 
-        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+          let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
-        // SET / UPDATE DATA TO TUMI DATABASE
-        let transaction = await setTransactionData(
-          pageTrx,
-          user_id,
-          spreadPerLevel,
-          robot_id
-        );
-        await page.waitFor(5000);
-
-        let matchStockBuy = transaction.matchStockBuy;
-        let matchStockSell = transaction.matchStockSell;
-        let openStockBuy = transaction.openStockBuy;
-        let openStockSell = transaction.openStockSell;
-
-        let openStock = transaction.openStock;
-
-        // REFRESH PAGE
-        if (matchStockBuy.length == 0 && matchStockSell.length == 0) {
-          await page.goto(URL_runningTrade);
-        }
-
-        // AUTOMATION SELL
-        if (matchStockBuy.length > 0) {
-          await automationSells(page, matchStockBuy, robot_id, user_id);
-        }
-
-        // AUTOMATION BUY
-        if (matchStockSell.length > 0) {
-          await automationBuys(page, matchStockSell, robot_id, user_id);
-        }
-
-        // SELL BY TIME (ON)
-        if (is_sell_by_time == "true") {
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : now = ",
-            now
+          // SET / UPDATE DATA TO TUMI DATABASE
+          let transaction = await setTransactionData(
+            pageTrx,
+            user_id,
+            spreadPerLevel,
+            robot_id
           );
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : sell time = ",
-            sell_time
-          );
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : openStockSell = ",
-            openStockSell
-          );
-          if (now >= sell_time) {
-            job.stop();
-            thisMessage =
-              "Robot telah selesai dengan sell time (sell by time yes)";
+          await page.waitFor(5000);
 
-            let execSellTimeTrue = [];
-            execSellTimeTrue[0] = await sellByTimeOnTrigger(
+          let matchStockBuy = transaction.matchStockBuy;
+          let matchStockSell = transaction.matchStockSell;
+          let openStockBuy = transaction.openStockBuy;
+          let openStockSell = transaction.openStockSell;
+
+          let openStock = transaction.openStock;
+
+          // REFRESH PAGE
+          if (matchStockBuy.length == 0 && matchStockSell.length == 0) {
+            await page.goto(URL_runningTrade);
+          }
+
+          // AUTOMATION SELL
+          if (matchStockBuy.length > 0) {
+            await automationSells(page, matchStockBuy, robot_id, user_id);
+          }
+
+          // AUTOMATION BUY
+          if (matchStockSell.length > 0) {
+            await automationBuys(page, matchStockSell, robot_id, user_id);
+          }
+
+          // SELL BY TIME (ON)
+          if (is_sell_by_time == "true") {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : now = ",
+              now
+            );
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : sell time = ",
+              sell_time
+            );
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : openStockSell = ",
+              openStockSell
+            );
+            if (now >= sell_time) {
+              job.stop();
+              thisMessage =
+                "Robot telah selesai dengan sell time (sell by time yes)";
+
+              let execSellTimeTrue = [];
+              execSellTimeTrue[0] = await sellByTimeOnTrigger(
+                page,
+                user_id,
+                openStockSell,
+                openStock,
+                robot_id
+              );
+              execSellTimeTrue[1] = await page.waitFor(5000);
+              execSellTimeTrue[2] = await automationTransaction(
+                pageTrx,
+                user_id,
+                robot_id
+              );
+              execSellTimeTrue[3] = await page.waitFor(5000);
+              execSellTimeTrue[4] = await setOffRobotStatus(
+                robot_id,
+                thisMessage
+              );
+              execSellTimeTrue[5] = await page.waitFor(5000);
+              execSellTimeTrue[6] = await browser.close();
+              Promise.all(execSellTimeTrue).then(() => {
+                console.log(
+                  "Robot " +
+                    robot_id +
+                    " : sellByTimeTrigger setTransactionData setOffRobotStatus finish!!!"
+                );
+              });
+            }
+          } else {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : now = ",
+              now
+            );
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : closeTime = ",
+              closeTime
+            );
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : Sell by time off trigger"
+            );
+            // SELL BY TIME (OFF)
+            await sellByTimeOffTrigger(
               page,
+              pagePF,
+              URL_protofolio,
               user_id,
-              openStockSell,
+              clValue,
+              profitPerLevel,
               openStock,
               robot_id
             );
-            execSellTimeTrue[1] = await page.waitFor(5000);
-            execSellTimeTrue[2] = await automationTransaction(
-              pageTrx,
-              user_id,
-              robot_id
-            );
-            execSellTimeTrue[3] = await page.waitFor(5000);
-            execSellTimeTrue[4] = await setOffRobotStatus(
-              robot_id,
-              thisMessage
-            );
-            execSellTimeTrue[5] = await page.waitFor(5000);
-            execSellTimeTrue[6] = await browser.close();
-            Promise.all(execSellTimeTrue).then(() => {
-              console.log(
-                "Robot " +
-                  robot_id +
-                  " : sellByTimeTrigger setTransactionData setOffRobotStatus finish!!!"
-              );
-            });
+
+            // TURN OFF ROBOT
+            if (now >= closeTime) {
+              job.stop();
+
+              thisMessage =
+                "Robot telah selesai dengan close time (sell by time no).";
+              let exec = [];
+
+              exec[0] = await setInitBuySell(page, user_id);
+              exec[1] = await page.waitFor(5000);
+              exec[2] = await automationTransaction(pageTrx, user_id, robot_id);
+              exec[3] = await page.waitFor(5000);
+              exec[4] = await setOffRobotStatus(robot_id, thisMessage);
+              exec[5] = await page.waitFor(5000);
+              exec[6] = await browser.close();
+
+              Promise.all(exec).then(() => {
+                console.log(
+                  "Robot " +
+                    robot_id +
+                    " : setInitBuySell setTransactionData setOffRobotStatus finish!!!"
+                );
+              });
+            }
           }
-        } else {
+
           console.log(
             moment().format("YYYY-MM-DD HH:mm:ss") +
               " Robot " +
               robot_id +
-              " : now = ",
-            now
+              " : Main job globalIndex = ",
+            globalIndex
           );
+          globalIndex++;
+        } catch (error) {
+          /**
+           * trigger for SECONDARY JOB
+           * if MAIN JOB has error, SECONDARY JOB must stop()
+           */
+          runSecondaryJob = false;
+
           console.log(
             moment().format("YYYY-MM-DD HH:mm:ss") +
               " Robot " +
               robot_id +
-              " : closeTime = ",
-            closeTime
-          );
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : Sell by time off trigger"
-          );
-          // SELL BY TIME (OFF)
-          await sellByTimeOffTrigger(
-            page,
-            pagePF,
-            URL_protofolio,
-            user_id,
-            clValue,
-            profitPerLevel,
-            openStock,
-            robot_id
+              " : Error from Main Job()"
           );
 
-          // TURN OFF ROBOT
-          if (now >= closeTime) {
-            job.stop();
-
-            thisMessage =
-              "Robot telah selesai dengan close time (sell by time no).";
-            let exec = [];
-
-            exec[0] = await setInitBuySell(page, user_id);
-            exec[1] = await page.waitFor(5000);
-            exec[2] = await automationTransaction(pageTrx, user_id, robot_id);
-            exec[3] = await page.waitFor(5000);
-            exec[4] = await setOffRobotStatus(robot_id, thisMessage);
-            exec[5] = await page.waitFor(5000);
-            exec[6] = await browser.close();
-
-            Promise.all(exec).then(() => {
-              console.log(
-                "Robot " +
-                  robot_id +
-                  " : setInitBuySell setTransactionData setOffRobotStatus finish!!!"
-              );
-            });
-          }
+          job.stop();
+          await closeErrorRobot(res, browser, thisMessage, robot_id);
         }
-
+      } else {
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
             " Robot " +
             robot_id +
-            " : Main job globalIndex = ",
-          globalIndex
+            " : mainJob stop()"
         );
-        globalIndex++;
-      } catch (error) {
-        // validate for secondary job
-        runSecondaryJob = false;
-
         job.stop();
-        await closeErrorRobot(res, browser, thisMessage, robot_id);
       }
     });
 
