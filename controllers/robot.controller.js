@@ -35,6 +35,7 @@ let secondaryS_GlobalIndex = 0;
 
 let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
 let thisInitBuy = true;
+let thisPortfolio = [];
 
 let runSecondaryJob = true;
 
@@ -618,7 +619,12 @@ module.exports.run = async function(req, res) {
             }
           }
 
-          await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
+          thisPortfolio = await automationPortofolio(
+            pagePF,
+            URL_protofolio,
+            user_id,
+            robot_id
+          );
           await pagePF.waitFor(5000);
 
           console.log(
@@ -875,7 +881,7 @@ module.exports.run = async function(req, res) {
     });
   } catch (error) {
     let msg = "Gagal terhubung dengan RHB";
-    await closeErrorRobot(res, browser, msg, robot_id);
+    await closeErrorRobotBeforeLogin(res, browser, msg, robot_id);
   }
 };
 
@@ -1662,87 +1668,92 @@ async function sellByTimeOnTrigger(
 async function sellByTimeOffTrigger(
   page,
   pagePF,
-  URL_protofolio,
+  URL_protofolio, //DEPRECATED
   user_id,
   clValue,
   profitPerLevel,
   openStock,
   robot_id
 ) {
-  let data = await automationPortofolio(
-    pagePF,
-    URL_protofolio,
-    user_id,
-    robot_id
-  );
+  let data = thisPortfolio;
+
   await pagePF.waitFor(1000);
 
-  let filterStockProtofolio = await data.table.map(el => ({
-    stock: el.stock,
-    last: el.last
-  }));
-
-  // get open stock
-  let stockOpen = await openStock;
-
-  if (stockOpen.length > 0) {
-    let mapStockOpen = stockOpen.map((el, i) => ({
-      ...el,
-      index: i
+  if (data.length > 0) {
+    let filterStockProtofolio = await data.table.map(el => ({
+      stock: el.stock,
+      last: el.last.replace(",", "")
     }));
 
-    mapStockOpen.forEach((el, i) => {
-      let dataLast = filterStockProtofolio.filter(fsp => fsp.stock == el.stock);
-      let price = parseInt(el.price);
-      let condition = "Normal";
+    // get open stock
+    let stockOpen = await openStock;
 
-      el.last = parseInt(dataLast[0].last);
-      el.cl = Math.round(price - (price * clValue) / 100);
-      el.tp = Math.round(price + (price * profitPerLevel) / 100);
+    if (stockOpen.length > 0) {
+      let mapStockOpen = stockOpen.map((el, i) => ({
+        ...el,
+        index: i
+      }));
 
-      if (el.mode == "Sell") {
-        // condition
-        if (el.last >= el.tp) {
-          condition = "TARGET PROFIT";
-        } else if (el.last < el.cl) {
-          condition = "CUT LOST";
-        }
-
-        // log detail price
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : Stock " +
-            el.stock +
-            " | price " +
-            el.price +
-            " | last : " +
-            el.last +
-            " | tp : " +
-            el.tp +
-            " | cl : " +
-            el.cl +
-            " | condition : " +
-            condition
+      mapStockOpen.forEach((el, i) => {
+        let dataLast = filterStockProtofolio.filter(
+          fsp => fsp.stock == el.stock
         );
-      }
-    });
+        let price = parseInt(el.price);
+        let condition = "Normal";
 
-    // get tp or cl
-    let tpclStock = await getTpClStock(mapStockOpen, user_id);
+        el.last = parseInt(dataLast[0].last);
+        el.cl = Math.round(price - (price * clValue) / 100);
+        el.tp = Math.round(price + (price * profitPerLevel) / 100);
 
-    if (tpclStock.length > 0) {
-      let tpclStockSell = tpclStock.filter(el => {
-        return el.mode == "Sell";
+        if (el.mode == "Sell") {
+          // condition
+          if (el.last >= el.tp) {
+            condition = "TARGET PROFIT";
+          } else if (el.last < el.cl) {
+            condition = "CUT LOST";
+          }
+
+          // log detail price
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Stock " +
+              el.stock +
+              " | price " +
+              el.price +
+              " | last : " +
+              el.last +
+              " | tp : " +
+              el.tp +
+              " | cl : " +
+              el.cl +
+              " | condition : " +
+              condition
+          );
+        }
       });
 
-      if (tpclStockSell.length > 0) {
-        await automationWithdrawStockSellOff(page, tpclStockSell, robot_id);
+      // get tp or cl
+      let tpclStock = await getTpClStock(mapStockOpen, user_id);
 
-        await page.waitFor(2000);
+      if (tpclStock.length > 0) {
+        let tpclStockSell = tpclStock.filter(el => {
+          return el.mode == "Sell";
+        });
 
-        await automationSellByTimesOff(page, tpclStockSell, user_id, robot_id);
+        if (tpclStockSell.length > 0) {
+          await automationWithdrawStockSellOff(page, tpclStockSell, robot_id);
+
+          await page.waitFor(2000);
+
+          await automationSellByTimesOff(
+            page,
+            tpclStockSell,
+            user_id,
+            robot_id
+          );
+        }
       }
     }
   }
@@ -2664,7 +2675,7 @@ async function login(res, browser, page, username, password, robot_id) {
     await page.click("button[type=submit]");
   } catch (error) {
     let msg = "Gagal bypass captcha";
-    await closeErrorRobot(res, browser, msg, robot_id);
+    await closeErrorRobotBeforeLogin(res, browser, msg, robot_id);
   }
 }
 
@@ -3316,7 +3327,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 
       let price = el.price.replace(",", "");
 
-      spread = Math.round(price * (spl / 100));
+      spread = await getSpread(price, spreadPerLevel);
 
       if (el.status == "Open") {
         openStock.push({
@@ -3413,6 +3424,25 @@ async function setInitBuySell(page, user_id) {
 
 // close error robot
 async function closeErrorRobot(res, browser, msg, robot_id) {
+  let message = msg;
+  let exec = [];
+
+  exec[0] = await setOffRobotStatus(robot_id, message);
+  exec[2] = await browser.close();
+
+  Promise.all(exec).then(() => {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : setOffRobotStatus finish!!!"
+    );
+  });
+}
+
+
+// close error robot before login
+async function closeErrorRobotBeforeLogin(res, browser, msg, robot_id) {
   let message = msg;
   let exec = [];
 
