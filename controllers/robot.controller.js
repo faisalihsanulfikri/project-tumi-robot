@@ -564,7 +564,7 @@ module.exports.run = async function(req, res) {
             moment().format("YYYY-MM-DD HH:mm:ss") +
               " Robot " +
               robot_id +
-              " : Error from Secondary Job()"
+              " : Error from Secondary Job() Transaction"
           );
         }
       } else {
@@ -587,47 +587,58 @@ module.exports.run = async function(req, res) {
      */
     const jobSecondaryP = new CronJob("*/120 * * * * *", async function() {
       if (runSecondaryJob) {
-        // INNITIATION
-        let now = moment().format("HH:mm:ss");
-        let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+        try {
+          // INNITIATION
+          let now = moment().format("HH:mm:ss");
+          let sell_time = moment(getSellTime).format("HH:mm:ss");
+          let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
-        // SELL BY TIME (ON)
-        if (is_sell_by_time == "true") {
-          if (now >= sell_time) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Portfolio stop()"
-            );
-            jobSecondaryP.stop();
+          // SELL BY TIME (ON)
+          if (is_sell_by_time == "true") {
+            if (now >= sell_time) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Portfolio stop()"
+              );
+              jobSecondaryP.stop();
+            }
+          } else {
+            // SELL BY TIME (OFF)
+            // TURN OFF ROBOT
+            if (now >= closeTime) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Portfolio stop()"
+              );
+              jobSecondaryP.stop();
+            }
           }
-        } else {
-          // SELL BY TIME (OFF)
-          // TURN OFF ROBOT
-          if (now >= closeTime) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Portfolio stop()"
-            );
-            jobSecondaryP.stop();
-          }
+
+          await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
+          await pagePF.waitFor(5000);
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Secondary job PortFolio = ",
+            secondaryP_GlobalIndex
+          );
+          secondaryP_GlobalIndex++;
+        } catch (error) {
+          runSecondaryJob = false;
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Error from Secondary Job() Portfolio"
+          );
         }
-
-        await automationPortofolio(pagePF, URL_protofolio, user_id, robot_id);
-        await pagePF.waitFor(5000);
-
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : Secondary job PortFolio = ",
-          secondaryP_GlobalIndex
-        );
-        secondaryP_GlobalIndex++;
       } else {
         console.log(
           moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -636,6 +647,8 @@ module.exports.run = async function(req, res) {
             " : runSecondaryJob jobSecondary Portfolio stop()"
         );
         jobSecondaryP.stop();
+        let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+        await closeErrorRobot(res, browser, msg, robot_id);
       }
     });
 
