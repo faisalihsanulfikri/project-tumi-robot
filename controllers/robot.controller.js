@@ -26,23 +26,622 @@ const CronJob = require("cron").CronJob;
 
 require("dotenv").config();
 
-let globalIndex = 0;
-let secondaryP_GlobalIndex = 0;
-let secondarySR_GlobalIndex = 0;
-let secondaryW_GlobalIndex = 0;
-let secondaryT_GlobalIndex = 0;
-let secondaryS_GlobalIndex = 0;
-
-let thisMessage = "Terindikasi double login atau Gagal terhubung dengan RHB";
-let thisInitBuy = true;
-let thisPortfolio = [];
-
-let runSecondaryJob = true;
-
 let getCloseTime = moment("16:15:00", "HH:mm:ss");
 
-let is_sell_by_time = "";
-let getSellTime = "";
+/**
+ *  gData is a global variable
+ *  - runSecondaryJob
+ *  - thisInitBuy
+ *  - thisPortfolio
+ *  - getSellTime
+ *  - is_sell_by_time
+ */
+var gData = {};
+
+module.exports.run = async function(req, res) {
+  // initiation global variable
+  let robot_id = req.params.robot_id;
+  let secondaryP_GlobalIndex = 0;
+  let secondarySR_GlobalIndex = 0;
+  let secondaryW_GlobalIndex = 0;
+  let secondaryT_GlobalIndex = 0;
+  let secondaryS_GlobalIndex = 0;
+
+  eval("gData.runSecondaryJob" + robot_id + "= true;");
+  eval("gData.thisInitBuy" + robot_id + "= true;");
+  eval("gData.thisPortfolio" + robot_id + "= [];");
+  eval("gData.getSellTime" + robot_id + "= '';");
+  eval("gData.is_sell_by_time" + robot_id + "= '';");
+  eval("gData.index" + robot_id + "= 0;");
+
+  console.log("Global Data Robot " + robot_id + " = ", gData);
+
+  const URL_login =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
+  const URL_protofolio =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/portfolio.jsp";
+  const URL_runningTrade =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp";
+  const URL_accountinfo =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/accountinfo.jsp";
+
+  let thisUser = await getUsers(robot_id);
+
+  let username = thisUser.security_user_id;
+  let password = thisUser.password;
+  let pin = thisUser.pin;
+  let user_id = thisUser.user_id;
+
+  /** TEST */
+
+  /** END TEST */
+
+  console.log(moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id);
+
+  /**
+   * OPEN BROWSER
+   */
+  let getHeadless;
+  process.env.CHROMIUM_HEADLESS == "true"
+    ? (getHeadless = true)
+    : (getHeadless = false);
+
+  const browser = await puppeteer.launch({
+    headless: getHeadless,
+    defaultViewport: null,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    // executablePath:
+    //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  });
+
+  try {
+    /**
+     * OPEN RHB PAGE
+     */
+    const page = await browser.newPage();
+    // page trading exec
+    const pageTrx = await browser.newPage();
+    // page portfolio
+    const pagePF = await browser.newPage();
+    // page stock ranking
+    const pageSR = await browser.newPage();
+    // page withdraws
+    const pageWd = await browser.newPage();
+    // page transaction
+    const pageT = await browser.newPage();
+
+    page.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageTrx.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pagePF.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageSR.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageWd.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+    pageT.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+
+    await page.goto(URL_login);
+    await page.waitFor(2000);
+
+    // LOGIN RHB
+    await login(res, browser, page, username, password, robot_id);
+    await setOnRobotStatus(robot_id);
+
+    // LOGIN TRADING
+    await loginTrading(res, browser, page, URL_runningTrade, pin);
+
+    // GET SETTING DATA
+    let settings = await getSettingData(user_id);
+
+    // GET SETTING DATA IF SELL BY TIME IS TRUE
+    let lastInit = await getLastInitBuysSells(user_id);
+    if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
+      settings = await getUpdateSettingData(pagePF, URL_protofolio, thisUser);
+    }
+
+    let level_per_stock = parseInt(await settings.level_per_stock);
+    let dana_per_stock = await settings.dana_per_stock;
+    let spreadPerLevel = await settings.spread_per_level;
+    let profitPerLevel = await settings.profit_per_level;
+    let clValue = await settings.cl_value;
+
+    let price_type = await settings.price_type;
+    let stock_value_string = await settings.stock_value;
+    let stock_value_data = await stock_value_string.split(",", 4);
+    let stock_mode_id = await settings.stock_mode;
+
+    if (stock_mode_id == "custom") {
+      stock_mode_id = "okjz6if";
+    }
+
+    eval("gData.is_sell_by_time" + robot_id + "= settings.is_sell_by_time;");
+
+    eval(
+      "gData.getSellTime" + robot_id + "= moment(settings.cl_time, 'HH:mm:ss');"
+    );
+
+    /** TEST */
+
+    /** END TEST */
+
+    /** START */
+
+    /**
+     *  SECONDARY JOB
+     *  Settings
+     */
+    const jobSecondaryS = new CronJob("*/120 * * * * *", async function() {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
+        // INNITIATION
+        settings = await getSettingData(user_id);
+        eval(
+          "gData.is_sell_by_time" + robot_id + "= settings.is_sell_by_time;"
+        );
+
+        eval(
+          "gData.getSellTime" +
+            robot_id +
+            "= moment(settings.cl_time, 'HH:mm:ss');"
+        );
+
+        let now = moment().format("HH:mm:ss");
+        let sell_time = moment(eval("gData.getSellTime" + robot_id)).format(
+          "HH:mm:ss"
+        );
+        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+        // SELL BY TIME (ON)
+        if (eval("gData.is_sell_by_time" + robot_id) == "true") {
+          if (now >= sell_time) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Settings stop()"
+            );
+            jobSecondaryS.stop();
+          }
+        } else {
+          // SELL BY TIME (OFF)
+          // TURN OFF ROBOT
+          if (now >= closeTime) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Settings stop()"
+            );
+            jobSecondaryS.stop();
+          }
+        }
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Secondary job Settings = ",
+          secondaryS_GlobalIndex
+        );
+        secondaryS_GlobalIndex++;
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Settings stop()"
+        );
+        jobSecondaryS.stop();
+      }
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Transaction
+     */
+    const jobSecondaryT = new CronJob("*/120 * * * * *", async function() {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
+        try {
+          // INNITIATION
+          let now = moment().format("HH:mm:ss");
+          let sell_time = moment(eval("gData.getSellTime" + robot_id)).format(
+            "HH:mm:ss"
+          );
+          let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+          // SELL BY TIME (ON)
+          if (eval("gData.is_sell_by_time" + robot_id) == "true") {
+            if (now >= sell_time) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Transaction stop()"
+              );
+              jobSecondaryT.stop();
+            }
+          } else {
+            // SELL BY TIME (OFF)
+            // TURN OFF ROBOT
+            if (now >= closeTime) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Transaction stop()"
+              );
+              jobSecondaryT.stop();
+            }
+          }
+
+          await automationTransaction(pageT, user_id, robot_id);
+          await pageT.waitFor(5000);
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Secondary job Transaction = ",
+            secondaryT_GlobalIndex
+          );
+          secondaryT_GlobalIndex++;
+        } catch (error) {
+          eval("gData.runSecondaryJob" + robot_id + "= false;");
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Error from Secondary Job() Transaction"
+          );
+        }
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Transaction stop()"
+        );
+        jobSecondaryT.stop();
+
+        let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+        await closeErrorRobot(res, browser, msg, robot_id);
+      }
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Portfolio
+     */
+    const jobSecondaryP = new CronJob("*/120 * * * * *", async function() {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
+        try {
+          // INNITIATION
+          let now = moment().format("HH:mm:ss");
+          let sell_time = moment(eval("gData.getSellTime" + robot_id)).format(
+            "HH:mm:ss"
+          );
+          let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+          // SELL BY TIME (ON)
+          if (eval("gData.is_sell_by_time" + robot_id) == "true") {
+            if (now >= sell_time) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Portfolio stop()"
+              );
+              jobSecondaryP.stop();
+            }
+          } else {
+            // SELL BY TIME (OFF)
+            // TURN OFF ROBOT
+            if (now >= closeTime) {
+              console.log(
+                moment().format("YYYY-MM-DD HH:mm:ss") +
+                  " Robot " +
+                  robot_id +
+                  " : jobSecondary Portfolio stop()"
+              );
+              jobSecondaryP.stop();
+            }
+          }
+
+          let result = await automationPortofolio(
+            pagePF,
+            URL_protofolio,
+            user_id,
+            robot_id
+          );
+          await pagePF.waitFor(5000);
+
+          eval("gData.thisPortfolio" + robot_id + "= await result;");
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Secondary job PortFolio = ",
+            secondaryP_GlobalIndex
+          );
+          secondaryP_GlobalIndex++;
+        } catch (error) {
+          eval("gData.runSecondaryJob" + robot_id + "= false;");
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : Error from Secondary Job() Portfolio"
+          );
+        }
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Portfolio stop()"
+        );
+        jobSecondaryP.stop();
+        let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+        await closeErrorRobot(res, browser, msg, robot_id);
+      }
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Stock Ranking
+     */
+    const jobSecondarySR = new CronJob("*/120 * * * * *", async function() {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
+        // INNITIATION
+        let now = moment().format("HH:mm:ss");
+        let sell_time = moment(eval("gData.getSellTime" + robot_id)).format(
+          "HH:mm:ss"
+        );
+        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+        // SELL BY TIME (ON)
+        if (eval("gData.is_sell_by_time" + robot_id) == "true") {
+          if (now >= sell_time) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Stock Ranking stop()"
+            );
+
+            jobSecondarySR.stop();
+          }
+        } else {
+          // SELL BY TIME (OFF)
+          // TURN OFF ROBOT
+          if (now >= closeTime) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Stock Ranking stop()"
+            );
+            jobSecondarySR.stop();
+          }
+        }
+
+        await inputStockRangking(pageSR);
+        await pageSR.waitFor(5000);
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Secondary job Stock Ranking = ",
+          secondarySR_GlobalIndex
+        );
+        secondarySR_GlobalIndex++;
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Stock Ranking stop()"
+        );
+        jobSecondarySR.stop();
+      }
+    });
+
+    /**
+     *  SECONDARY JOB
+     *  Integrate Withdraws
+     */
+    const jobSecondaryW = new CronJob("*/120 * * * * *", async function() {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
+        // INNITIATION
+        let now = moment().format("HH:mm:ss");
+        let sell_time = moment(eval("gData.getSellTime" + robot_id)).format(
+          "HH:mm:ss"
+        );
+        let closeTime = moment(getCloseTime).format("HH:mm:ss");
+
+        // SELL BY TIME (ON)
+        if (eval("gData.is_sell_by_time" + robot_id) == "true") {
+          if (now >= sell_time) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Withdraws stop()"
+            );
+            jobSecondaryW.stop();
+          }
+        } else {
+          // SELL BY TIME (OFF)
+          // TURN OFF ROBOT
+          if (now >= closeTime) {
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : jobSecondary Withdraws stop()"
+            );
+            jobSecondaryW.stop();
+          }
+        }
+
+        await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
+        await pageWd.waitFor(5000);
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : Secondary job Withdraws = ",
+          secondaryW_GlobalIndex
+        );
+        secondaryW_GlobalIndex++;
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary Withdraws stop()"
+        );
+        jobSecondaryW.stop();
+      }
+    });
+
+    /**
+     *  VALIDATE INITIATION BUY TIME
+     *
+     *  transaction cycle will run after initiation buy
+     */
+    const isMoreThanBuyTime = new CronJob("*/30 * * * * *", async function() {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
+        let now = moment().format("HH:mm:ss");
+        let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
+        let buy_time = moment(getBuyTime).format("HH:mm:ss");
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : now",
+          now
+        );
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : buy_time",
+          buy_time
+        );
+
+        if (now >= buy_time) {
+          isMoreThanBuyTime.stop();
+
+          // get all stock for custom
+          if (stock_mode_id == "custom") {
+            stock_mode_id = "okjz6if";
+          }
+
+          let initBuyDataStock = await getInitBuyDataStock(
+            price_type,
+            stock_value_data,
+            stock_mode_id,
+            robot_id
+          );
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : isMoreThanBuyTime",
+            initBuyDataStock
+          );
+
+          let dataInitBuyStock = await setInitBuyStock(
+            initBuyDataStock,
+            user_id,
+            dana_per_stock,
+            level_per_stock,
+            spreadPerLevel,
+            robot_id
+          );
+
+          console.log("dataInitBuyStock = ", dataInitBuyStock);
+
+          await main(
+            res,
+            page,
+            pageTrx,
+            pagePF,
+            pageSR,
+            pageWd,
+            browser,
+            user_id,
+            settings,
+            robot_id,
+            URL_protofolio,
+            thisUser,
+            URL_accountinfo,
+            spreadPerLevel,
+            clValue,
+            profitPerLevel,
+            dataInitBuyStock,
+            URL_runningTrade
+          );
+        }
+      } else {
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : runSecondaryJob jobSecondary isMoreThanBuyTime stop()"
+        );
+        isMoreThanBuyTime.stop();
+      }
+    });
+
+    /** FOR TEST GLOBAL VARIABLE */
+    // const jobSecondaryTest = new CronJob("*/1 * * * * *", async function() {
+    //   console.log(
+    //     moment().format("YYYY-MM-DD HH:mm:ss") +
+    //       " Robot " +
+    //       robot_id +
+    //       " : Secondary job Withdraws = ",
+    //     eval("gData.index" + robot_id)
+    //   );
+    //   eval("gData.index" + robot_id + "++");
+    // });
+
+    jobSecondaryS.start();
+    jobSecondaryP.start();
+    jobSecondarySR.start();
+    jobSecondaryW.start();
+    jobSecondaryT.start();
+    isMoreThanBuyTime.start();
+
+    /** FOR TEST GLOBAL VARIABLE */
+    // jobSecondaryTest.start();
+
+    /** END */
+    return res.json({
+      success: 1,
+      message: "Robot sudah berjalan."
+    });
+  } catch (error) {
+    let msg = "Gagal terhubung dengan RHB";
+    await closeErrorRobotBeforeLogin(res, browser, msg, robot_id);
+  }
+};
 
 // get data stock from google spreadsheet
 async function getStockFromSheet(stockModeId) {
@@ -333,558 +932,6 @@ async function updateInitDataSellTimeOff(id, user_id) {
   }
 }
 
-module.exports.run = async function(req, res) {
-  let robot_id = req.params.robot_id;
-  const URL_login =
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/login.jsp";
-  const URL_protofolio =
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/portfolio.jsp";
-  const URL_runningTrade =
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/runningTrade.jsp";
-  const URL_accountinfo =
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/accountinfo.jsp";
-
-  let thisUser = await getUsers(robot_id);
-
-  let username = thisUser.security_user_id;
-  let password = thisUser.password;
-  let pin = thisUser.pin;
-  let user_id = thisUser.user_id;
-
-  /** TEST */
-
-  /** END TEST */
-
-  console.log(moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id);
-
-  /**
-   * OPEN BROWSER
-   */
-  let getHeadless;
-  process.env.CHROMIUM_HEADLESS == "true"
-    ? (getHeadless = true)
-    : (getHeadless = false);
-
-  const browser = await puppeteer.launch({
-    headless: getHeadless,
-    defaultViewport: null,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    // executablePath:
-    //   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-  });
-
-  try {
-    /**
-     * OPEN RHB PAGE
-     */
-    const page = await browser.newPage();
-    // page trading exec
-    const pageTrx = await browser.newPage();
-    // page portfolio
-    const pagePF = await browser.newPage();
-    // page stock ranking
-    const pageSR = await browser.newPage();
-    // page withdraws
-    const pageWd = await browser.newPage();
-    // page transaction
-    const pageT = await browser.newPage();
-
-    page.on("dialog", async dialog => {
-      await dialog.accept();
-    });
-    pageTrx.on("dialog", async dialog => {
-      await dialog.accept();
-    });
-    pagePF.on("dialog", async dialog => {
-      await dialog.accept();
-    });
-    pageSR.on("dialog", async dialog => {
-      await dialog.accept();
-    });
-    pageWd.on("dialog", async dialog => {
-      await dialog.accept();
-    });
-    pageT.on("dialog", async dialog => {
-      await dialog.accept();
-    });
-
-    await page.goto(URL_login);
-    await page.waitFor(2000);
-
-    // LOGIN RHB
-    await login(res, browser, page, username, password, robot_id);
-    await setOnRobotStatus(robot_id);
-
-    // LOGIN TRADING
-    await loginTrading(res, browser, page, URL_runningTrade, pin);
-
-    // GET SETTING DATA
-    let settings = await getSettingData(user_id);
-
-    // GET SETTING DATA IF SELL BY TIME IS TRUE
-    let lastInit = await getLastInitBuysSells(user_id);
-    if (settings.is_sell_by_time == "true" || lastInit.length == 0) {
-      settings = await getUpdateSettingData(pagePF, URL_protofolio, thisUser);
-    }
-
-    let level_per_stock = parseInt(await settings.level_per_stock);
-    let dana_per_stock = await settings.dana_per_stock;
-    let spreadPerLevel = await settings.spread_per_level;
-    let profitPerLevel = await settings.profit_per_level;
-    let clValue = await settings.cl_value;
-
-    let price_type = await settings.price_type;
-    let stock_value_string = await settings.stock_value;
-    let stock_value_data = await stock_value_string.split(",", 4);
-    let stock_mode_id = await settings.stock_mode;
-
-    if (stock_mode_id == "custom") {
-      stock_mode_id = "okjz6if";
-    }
-
-    is_sell_by_time = settings.is_sell_by_time;
-    getSellTime = moment(settings.cl_time, "HH:mm:ss");
-
-    /** TEST */
-
-    /** END TEST */
-
-    /** START */
-
-    /**
-     *  SECONDARY JOB
-     *  Settings
-     */
-    const jobSecondaryS = new CronJob("*/120 * * * * *", async function() {
-      if (runSecondaryJob) {
-        // INNITIATION
-        settings = await getSettingData(user_id);
-        is_sell_by_time = settings.is_sell_by_time;
-        getSellTime = moment(settings.cl_time, "HH:mm:ss");
-
-        let now = moment().format("HH:mm:ss");
-        let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-        // SELL BY TIME (ON)
-        if (is_sell_by_time == "true") {
-          if (now >= sell_time) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Settings stop()"
-            );
-            jobSecondaryS.stop();
-          }
-        } else {
-          // SELL BY TIME (OFF)
-          // TURN OFF ROBOT
-          if (now >= closeTime) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Settings stop()"
-            );
-            jobSecondaryS.stop();
-          }
-        }
-
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : Secondary job Settings = ",
-          secondaryS_GlobalIndex
-        );
-        secondaryS_GlobalIndex++;
-      } else {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : runSecondaryJob jobSecondary Settings stop()"
-        );
-        jobSecondaryS.stop();
-      }
-    });
-
-    /**
-     *  SECONDARY JOB
-     *  Integrate Transaction
-     */
-    const jobSecondaryT = new CronJob("*/120 * * * * *", async function() {
-      if (runSecondaryJob) {
-        try {
-          // INNITIATION
-          let now = moment().format("HH:mm:ss");
-          let sell_time = moment(getSellTime).format("HH:mm:ss");
-          let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-          // SELL BY TIME (ON)
-          if (is_sell_by_time == "true") {
-            if (now >= sell_time) {
-              console.log(
-                moment().format("YYYY-MM-DD HH:mm:ss") +
-                  " Robot " +
-                  robot_id +
-                  " : jobSecondary Transaction stop()"
-              );
-              jobSecondaryT.stop();
-            }
-          } else {
-            // SELL BY TIME (OFF)
-            // TURN OFF ROBOT
-            if (now >= closeTime) {
-              console.log(
-                moment().format("YYYY-MM-DD HH:mm:ss") +
-                  " Robot " +
-                  robot_id +
-                  " : jobSecondary Transaction stop()"
-              );
-              jobSecondaryT.stop();
-            }
-          }
-
-          await automationTransaction(pageT, user_id, robot_id);
-          await pageT.waitFor(5000);
-
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : Secondary job Transaction = ",
-            secondaryT_GlobalIndex
-          );
-          secondaryT_GlobalIndex++;
-        } catch (error) {
-          runSecondaryJob = false;
-
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : Error from Secondary Job() Transaction"
-          );
-        }
-      } else {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : runSecondaryJob jobSecondary Transaction stop()"
-        );
-        jobSecondaryT.stop();
-
-        let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
-        await closeErrorRobot(res, browser, msg, robot_id);
-      }
-    });
-
-    /**
-     *  SECONDARY JOB
-     *  Integrate Portfolio
-     */
-    const jobSecondaryP = new CronJob("*/120 * * * * *", async function() {
-      if (runSecondaryJob) {
-        try {
-          // INNITIATION
-          let now = moment().format("HH:mm:ss");
-          let sell_time = moment(getSellTime).format("HH:mm:ss");
-          let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-          // SELL BY TIME (ON)
-          if (is_sell_by_time == "true") {
-            if (now >= sell_time) {
-              console.log(
-                moment().format("YYYY-MM-DD HH:mm:ss") +
-                  " Robot " +
-                  robot_id +
-                  " : jobSecondary Portfolio stop()"
-              );
-              jobSecondaryP.stop();
-            }
-          } else {
-            // SELL BY TIME (OFF)
-            // TURN OFF ROBOT
-            if (now >= closeTime) {
-              console.log(
-                moment().format("YYYY-MM-DD HH:mm:ss") +
-                  " Robot " +
-                  robot_id +
-                  " : jobSecondary Portfolio stop()"
-              );
-              jobSecondaryP.stop();
-            }
-          }
-
-          thisPortfolio = await automationPortofolio(
-            pagePF,
-            URL_protofolio,
-            user_id,
-            robot_id
-          );
-          await pagePF.waitFor(5000);
-
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : Secondary job PortFolio = ",
-            secondaryP_GlobalIndex
-          );
-          secondaryP_GlobalIndex++;
-        } catch (error) {
-          runSecondaryJob = false;
-
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : Error from Secondary Job() Portfolio"
-          );
-        }
-      } else {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : runSecondaryJob jobSecondary Portfolio stop()"
-        );
-        jobSecondaryP.stop();
-        let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
-        await closeErrorRobot(res, browser, msg, robot_id);
-      }
-    });
-
-    /**
-     *  SECONDARY JOB
-     *  Integrate Stock Ranking
-     */
-    const jobSecondarySR = new CronJob("*/120 * * * * *", async function() {
-      if (runSecondaryJob) {
-        // INNITIATION
-        let now = moment().format("HH:mm:ss");
-        let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-        // SELL BY TIME (ON)
-        if (is_sell_by_time == "true") {
-          if (now >= sell_time) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Stock Ranking stop()"
-            );
-
-            jobSecondarySR.stop();
-          }
-        } else {
-          // SELL BY TIME (OFF)
-          // TURN OFF ROBOT
-          if (now >= closeTime) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Stock Ranking stop()"
-            );
-            jobSecondarySR.stop();
-          }
-        }
-
-        await inputStockRangking(pageSR);
-        await pageSR.waitFor(5000);
-
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : Secondary job Stock Ranking = ",
-          secondarySR_GlobalIndex
-        );
-        secondarySR_GlobalIndex++;
-      } else {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : runSecondaryJob jobSecondary Stock Ranking stop()"
-        );
-        jobSecondarySR.stop();
-      }
-    });
-
-    /**
-     *  SECONDARY JOB
-     *  Integrate Withdraws
-     */
-    const jobSecondaryW = new CronJob("*/120 * * * * *", async function() {
-      if (runSecondaryJob) {
-        // INNITIATION
-        let now = moment().format("HH:mm:ss");
-        let sell_time = moment(getSellTime).format("HH:mm:ss");
-        let closeTime = moment(getCloseTime).format("HH:mm:ss");
-
-        // SELL BY TIME (ON)
-        if (is_sell_by_time == "true") {
-          if (now >= sell_time) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Withdraws stop()"
-            );
-            jobSecondaryW.stop();
-          }
-        } else {
-          // SELL BY TIME (OFF)
-          // TURN OFF ROBOT
-          if (now >= closeTime) {
-            console.log(
-              moment().format("YYYY-MM-DD HH:mm:ss") +
-                " Robot " +
-                robot_id +
-                " : jobSecondary Withdraws stop()"
-            );
-            jobSecondaryW.stop();
-          }
-        }
-
-        await withdraws(pageWd, URL_accountinfo, robot_id, user_id);
-        await pageWd.waitFor(5000);
-
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : Secondary job Withdraws = ",
-          secondaryW_GlobalIndex
-        );
-        secondaryW_GlobalIndex++;
-      } else {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : runSecondaryJob jobSecondary Withdraws stop()"
-        );
-        jobSecondaryW.stop();
-      }
-    });
-
-    /**
-     *  VALIDATE INITIATION BUY TIME
-     *
-     *  transaction cycle will run after initiation buy
-     */
-    const isMoreThanBuyTime = new CronJob("*/30 * * * * *", async function() {
-      if (runSecondaryJob) {
-        let now = moment().format("HH:mm:ss");
-        let getBuyTime = moment(settings.buy_time, "HH:mm:ss");
-        let buy_time = moment(getBuyTime).format("HH:mm:ss");
-
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : now",
-          now
-        );
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : buy_time",
-          buy_time
-        );
-
-        if (now >= buy_time) {
-          isMoreThanBuyTime.stop();
-
-          // get all stock for custom
-          if (stock_mode_id == "custom") {
-            stock_mode_id = "okjz6if";
-          }
-
-          let initBuyDataStock = await getInitBuyDataStock(
-            price_type,
-            stock_value_data,
-            stock_mode_id,
-            robot_id
-          );
-
-          console.log(
-            moment().format("YYYY-MM-DD HH:mm:ss") +
-              " Robot " +
-              robot_id +
-              " : isMoreThanBuyTime",
-            initBuyDataStock
-          );
-
-          let dataInitBuyStock = await setInitBuyStock(
-            initBuyDataStock,
-            user_id,
-            dana_per_stock,
-            level_per_stock,
-            spreadPerLevel,
-            robot_id
-          );
-
-          console.log("dataInitBuyStock = ", dataInitBuyStock);
-
-          await main(
-            res,
-            page,
-            pageTrx,
-            pagePF,
-            pageSR,
-            pageWd,
-            browser,
-            user_id,
-            settings,
-            robot_id,
-            URL_protofolio,
-            thisUser,
-            URL_accountinfo,
-            spreadPerLevel,
-            clValue,
-            profitPerLevel,
-            dataInitBuyStock,
-            URL_runningTrade
-          );
-        }
-      } else {
-        console.log(
-          moment().format("YYYY-MM-DD HH:mm:ss") +
-            " Robot " +
-            robot_id +
-            " : runSecondaryJob jobSecondary isMoreThanBuyTime stop()"
-        );
-        isMoreThanBuyTime.stop();
-      }
-    });
-
-    jobSecondaryS.start();
-    jobSecondaryP.start();
-    jobSecondarySR.start();
-    jobSecondaryW.start();
-    jobSecondaryT.start();
-    isMoreThanBuyTime.start();
-
-    /** END */
-    return res.json({
-      success: 1,
-      message: "Robot sudah berjalan."
-    });
-  } catch (error) {
-    let msg = "Gagal terhubung dengan RHB";
-    await closeErrorRobotBeforeLogin(res, browser, msg, robot_id);
-  }
-};
-
 // main automation
 async function main(
   res,
@@ -931,7 +978,7 @@ async function main(
       " Robot " +
       robot_id +
       " : main thisInitBuy = ",
-    thisInitBuy
+    eval("gData.thisInitBuy" + robot_id)
   );
 
   mainExec[1] = await page.waitFor(5000);
@@ -993,30 +1040,31 @@ async function automation(
   spreadPerLevel,
   URL_runningTrade
 ) {
+  let globalIndex = 0;
+
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
       " Robot " +
       robot_id +
       " : automation thisInitBuy = ",
-    thisInitBuy
+    eval("gData.thisInitBuy" + robot_id)
   );
 
   // initiation buy success
-  if (thisInitBuy == true) {
+  if (eval("gData.thisInitBuy" + robot_id) == true) {
     // main job
     const job = new CronJob("*/120 * * * * *", async function() {
       /**
        * trigger for MAIN JOB
        * if SECONDARY JOB has error, MAIN JOB must stop()
        */
-      if (runSecondaryJob) {
+      if (eval("gData.runSecondaryJob" + robot_id)) {
         try {
           // INNITIATION
-          settings = await getSettingData(user_id);
           let now = moment().format("HH:mm:ss");
-          let is_sell_by_time = settings.is_sell_by_time;
-          let getSellTime = moment(settings.cl_time, "HH:mm:ss");
-          let sell_time = moment(getSellTime).format("HH:mm:ss");
+          let sell_time = moment(eval("gData.getSellTime" + robot_id)).format(
+            "HH:mm:ss"
+          );
 
           let closeTime = moment(getCloseTime).format("HH:mm:ss");
 
@@ -1052,7 +1100,7 @@ async function automation(
           }
 
           // SELL BY TIME (ON)
-          if (is_sell_by_time == "true") {
+          if (eval("gData.is_sell_by_time" + robot_id) == "true") {
             console.log(
               moment().format("YYYY-MM-DD HH:mm:ss") +
                 " Robot " +
@@ -1076,8 +1124,7 @@ async function automation(
             );
             if (now >= sell_time) {
               job.stop();
-              thisMessage =
-                "Robot telah selesai dengan sell time (sell by time yes)";
+              msg = "Robot telah selesai dengan sell time (sell by time yes)";
 
               let execSellTimeTrue = [];
               execSellTimeTrue[0] = await sellByTimeOnTrigger(
@@ -1094,10 +1141,7 @@ async function automation(
                 robot_id
               );
               execSellTimeTrue[3] = await page.waitFor(5000);
-              execSellTimeTrue[4] = await setOffRobotStatus(
-                robot_id,
-                thisMessage
-              );
+              execSellTimeTrue[4] = await setOffRobotStatus(robot_id, msg);
               execSellTimeTrue[5] = await page.waitFor(5000);
               execSellTimeTrue[6] = await browser.close();
               Promise.all(execSellTimeTrue).then(() => {
@@ -1145,7 +1189,7 @@ async function automation(
             if (now >= closeTime) {
               job.stop();
 
-              thisMessage =
+              let msg =
                 "Robot telah selesai dengan close time (sell by time no).";
               let exec = [];
 
@@ -1153,7 +1197,7 @@ async function automation(
               exec[1] = await page.waitFor(5000);
               exec[2] = await automationTransaction(pageTrx, user_id, robot_id);
               exec[3] = await page.waitFor(5000);
-              exec[4] = await setOffRobotStatus(robot_id, thisMessage);
+              exec[4] = await setOffRobotStatus(robot_id, msg);
               exec[5] = await page.waitFor(5000);
               exec[6] = await browser.close();
 
@@ -1180,7 +1224,7 @@ async function automation(
            * trigger for SECONDARY JOB
            * if MAIN JOB has error, SECONDARY JOB must stop()
            */
-          runSecondaryJob = false;
+          eval("gData.runSecondaryJob" + robot_id + "= false;");
 
           console.log(
             moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -1190,6 +1234,8 @@ async function automation(
           );
 
           job.stop();
+          let thisMessage =
+            "Terindikasi double login atau Gagal terhubung dengan RHB";
           await closeErrorRobot(res, browser, thisMessage, robot_id);
         }
       } else {
@@ -1213,8 +1259,8 @@ async function automation(
         " : initiation buy failed"
     );
 
-    thisMessage = "Gagal initiation buy";
-    await setRobotStatusInitFail(robot_id, thisMessage);
+    let msg = "Gagal initiation buy";
+    await setRobotStatusInitFail(robot_id, msg);
 
     const jobFailInitBuy = new CronJob("*/120 * * * * *", async function() {
       // INNITIATION
@@ -1226,10 +1272,10 @@ async function automation(
       if (now >= closeTime) {
         jobFailInitBuy.stop();
 
-        thisMessage = "Robot telah selesai namun gagal initiation buy.";
+        let msg = "Robot telah selesai namun gagal initiation buy.";
         let exec = [];
 
-        exec[0] = await setOffRobotStatus(robot_id, thisMessage);
+        exec[0] = await setOffRobotStatus(robot_id, msg);
         exec[1] = await page.waitFor(5000);
         exec[2] = await browser.close();
 
@@ -1675,7 +1721,7 @@ async function sellByTimeOffTrigger(
   openStock,
   robot_id
 ) {
-  let data = thisPortfolio;
+  let data = eval("gData.thisPortfolio" + robot_id);
 
   await pagePF.waitFor(1000);
 
@@ -3439,7 +3485,6 @@ async function closeErrorRobot(res, browser, msg, robot_id) {
     );
   });
 }
-
 
 // close error robot before login
 async function closeErrorRobotBeforeLogin(res, browser, msg, robot_id) {
