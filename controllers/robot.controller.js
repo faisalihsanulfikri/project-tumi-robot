@@ -364,7 +364,17 @@ module.exports.run = async function(req, res) {
           );
           await pagePF.waitFor(5000);
 
-          eval("gData.thisPortfolio" + robot_id + "= await result;");
+          if (result.length > 0) {
+            eval("gData.thisPortfolio" + robot_id + "= result;");
+
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : automationPortofolio = ",
+              eval("gData.thisPortfolio" + robot_id)
+            );
+          }
 
           console.log(
             moment().format("YYYY-MM-DD HH:mm:ss") +
