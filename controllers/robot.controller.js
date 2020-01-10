@@ -1087,6 +1087,14 @@ async function automation(
           );
           await page.waitFor(5000);
 
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : transactionData",
+            transaction
+          );
+
           let matchStockBuy = transaction.matchStockBuy;
           let matchStockSell = transaction.matchStockSell;
           let openStockBuy = transaction.openStockBuy;
@@ -3254,6 +3262,14 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
 async function automationTransaction(pageT, user_id, robot_id) {
   let getDataTransaction = await getTransaction(pageT);
 
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : automationTransaction",
+    getDataTransaction
+  );
+
   await pageT.waitFor(5000);
 
   if (getDataTransaction.length > 0) {
@@ -3362,6 +3378,14 @@ async function getLastInitBuysSells(user_id) {
 async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
   let getDataTransaction = await getTransaction(pageTrx);
 
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : getDataTransaction",
+    getDataTransaction
+  );
+
   await pageTrx.waitFor(4000);
 
   let err, transaction;
@@ -3447,6 +3471,14 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
     openStockBuy,
     openStock
   };
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Filter Data From Order Status Page",
+    dataStock
+  );
 
   return dataStock;
 }
