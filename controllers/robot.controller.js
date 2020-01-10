@@ -632,11 +632,11 @@ module.exports.run = async function(req, res) {
     //   eval("gData.index" + robot_id + "++");
     // });
 
-    jobSecondaryS.start();
-    jobSecondaryP.start();
-    jobSecondarySR.start();
-    jobSecondaryW.start();
-    jobSecondaryT.start();
+    // jobSecondaryS.start();
+    // jobSecondaryP.start();
+    // jobSecondarySR.start();
+    // jobSecondaryW.start();
+    // jobSecondaryT.start();
     isMoreThanBuyTime.start();
 
     /** FOR TEST GLOBAL VARIABLE */
@@ -788,6 +788,8 @@ async function setInitBuyStock(
       " : setInitBuyStock insertStockToDb",
     insertStockToDb
   );
+
+  return insertStockToDb;
 
   let err, getInitBuyStockData, initBuyStock;
 
@@ -965,23 +967,23 @@ async function main(
 ) {
   let mainExec = [];
 
-  if (settings.is_sell_by_time == "true") {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-    mainExec[0] = await automationInitBuys(
-      page,
-      robot_id,
-      dataInitBuyStock,
-      user_id
-    );
-  } else {
-    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-    mainExec[0] = await automationInitBuysSellTimeFalse(
-      page,
-      robot_id,
-      dataInitBuyStock,
-      user_id
-    );
-  }
+  // if (settings.is_sell_by_time == "true") {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+  //   mainExec[0] = await automationInitBuys(
+  //     page,
+  //     robot_id,
+  //     dataInitBuyStock,
+  //     user_id
+  //   );
+  // } else {
+  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+  //   mainExec[0] = await automationInitBuysSellTimeFalse(
+  //     page,
+  //     robot_id,
+  //     dataInitBuyStock,
+  //     user_id
+  //   );
+  // }
 
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -1108,14 +1110,14 @@ async function automation(
           }
 
           // AUTOMATION SELL
-          if (matchStockBuy.length > 0) {
-            await automationSells(page, matchStockBuy, robot_id, user_id);
-          }
+          // if (matchStockBuy.length > 0) {
+          //   await automationSells(page, matchStockBuy, robot_id, user_id);
+          // }
 
           // AUTOMATION BUY
-          if (matchStockSell.length > 0) {
-            await automationBuys(page, matchStockSell, robot_id, user_id);
-          }
+          // if (matchStockSell.length > 0) {
+          //   await automationBuys(page, matchStockSell, robot_id, user_id);
+          // }
 
           // SELL BY TIME (ON)
           if (eval("gData.is_sell_by_time" + robot_id) == "true") {
@@ -3388,11 +3390,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 
   await pageTrx.waitFor(4000);
 
-  let err, transaction;
-
   let dataStock = {};
-  let dataStockBuy = [];
-  let dataStockSell = [];
   let openStockBuy = [];
   let openStockSell = [];
   let matchStockBuy = [];
@@ -3409,6 +3407,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 
       spread = await getSpread(price, spreadPerLevel);
 
+      /** FILTER DATA OPEN */
       if (el.status == "Open") {
         openStock.push({
           order_id: el.order_id,
@@ -3423,8 +3422,11 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
         });
       }
 
-      if (el.mode == "Buy") {
-        dataStockBuy.push({
+      /** FILTER DATA ORDER BUY */
+
+      // data order buy with status = open
+      if (el.status == "Open" && el.mode == "Buy") {
+        openStockBuy.push({
           order_id: el.order_id,
           user_id: user_id,
           stock: el.stock,
@@ -3436,8 +3438,45 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
           updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
         });
-      } else if (el.mode == "Sell") {
-        dataStockSell.push({
+      }
+
+      // data order buy with status = matched
+      if (el.status == "Matched" && el.mode == "Buy") {
+        matchStockBuy.push({
+          order_id: el.order_id,
+          user_id: user_id,
+          stock: el.stock,
+          mode: el.mode,
+          lots: el.lots,
+          status: el.status,
+          priceBuy: price,
+          priceSell: (parseInt(price) + spread).toString(),
+          createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+        });
+      }
+
+      /** FILTER DATA ORDER SELL */
+
+      // data order sell with status = open
+      if (el.status == "Open" && el.mode == "Sell") {
+        openStockSell.push({
+          order_id: el.order_id,
+          user_id: user_id,
+          stock: el.stock,
+          mode: el.mode,
+          lots: el.lots,
+          status: el.status,
+          priceBuy: (parseInt(price) - spread).toString(),
+          priceSell: price,
+          createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment().format("YYYY-MM-DD HH:mm:ss")
+        });
+      }
+
+      // data order sell with status = matched
+      if (el.status == "Matched" && el.mode == "Sell") {
+        matchStockSell.push({
           order_id: el.order_id,
           user_id: user_id,
           stock: el.stock,
@@ -3451,36 +3490,48 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
         });
       }
     });
+    
+    await pageTrx.waitFor(4000);
 
-    // order buy matched = need to sell
-    matchStockSell = dataStockSell.filter(el => el.status == "Matched");
-    // data order sell with status = open
-    openStockSell = dataStockSell.filter(el => el.status == "Open");
-    // order sell matched = need to buy
-    matchStockBuy = dataStockBuy.filter(el => el.status == "Matched");
-    // data order buy with status = open
-    openStockBuy = dataStockBuy.filter(el => el.status == "Open");
+    dataStock = {
+      matchStockSell,
+      matchStockBuy,
+      openStockSell,
+      openStockBuy,
+      openStock
+    };
+
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Filter Data From Order Status Page",
+      dataStock
+    );
+
+    return dataStock;
+
+  } else {
+    await pageTrx.waitFor(4000);
+
+    dataStock = {
+      matchStockSell,
+      matchStockBuy,
+      openStockSell,
+      openStockBuy,
+      openStock
+    };
+
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Filter Data From Order Status Page",
+      dataStock
+    );
+
+    return dataStock;
   }
-
-  dataStock = {
-    dataStockSell,
-    dataStockBuy,
-    matchStockSell,
-    matchStockBuy,
-    openStockSell,
-    openStockBuy,
-    openStock
-  };
-
-  console.log(
-    moment().format("YYYY-MM-DD HH:mm:ss") +
-      " Robot " +
-      robot_id +
-      " : Filter Data From Order Status Page",
-    dataStock
-  );
-
-  return dataStock;
 }
 
 // set last init sell by time off
