@@ -2650,28 +2650,28 @@ async function getBuyPrice(level, spreadPerLevel, priceData) {
 // get spread price
 async function getSpread(dataPrice, spreadPerLevel) {
   // spread per level
-  let spl = parseInt(await spreadPerLevel); //DEPRECATED
+  let spl = parseInt(await spreadPerLevel);
   let spread = 0;
   let price = parseInt(dataPrice);
 
   if (price < 200) {
-    spread = 1;
+    spread = 1 * spl;
   }
 
   if (price >= 200 && price < 500) {
-    spread = 2;
+    spread = 2 * spl;
   }
 
   if (price >= 500 && price < 2000) {
-    spread = 5;
+    spread = 5 * spl;
   }
 
   if (price >= 2000 && price < 5000) {
-    spread = 10;
+    spread = 10 * spl;
   }
 
   if (price >= 5000) {
-    spread = 25;
+    spread = 25 * spl;
   }
 
   return spread;
@@ -3398,7 +3398,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 
   if (getDataTransaction.length > 0) {
     getDataTransaction.forEach(async (el, i) => {
-      let spl = parseInt(spreadPerLevel);
+      let spl = parseInt(spreadPerLevel); //DEPRECATED
       let spread = 0;
 
       let price = el.price.replace(",", "");
@@ -3488,7 +3488,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
         });
       }
     });
-    
+
     await pageTrx.waitFor(4000);
 
     dataStock = {
@@ -3508,7 +3508,6 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
     );
 
     return dataStock;
-
   } else {
     await pageTrx.waitFor(4000);
 
