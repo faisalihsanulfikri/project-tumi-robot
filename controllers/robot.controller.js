@@ -632,11 +632,11 @@ module.exports.run = async function(req, res) {
     //   eval("gData.index" + robot_id + "++");
     // });
 
-    // jobSecondaryS.start();
-    // jobSecondaryP.start();
-    // jobSecondarySR.start();
-    // jobSecondaryW.start();
-    // jobSecondaryT.start();
+    jobSecondaryS.start();
+    jobSecondaryP.start();
+    jobSecondarySR.start();
+    jobSecondaryW.start();
+    jobSecondaryT.start();
     isMoreThanBuyTime.start();
 
     /** FOR TEST GLOBAL VARIABLE */
@@ -788,8 +788,6 @@ async function setInitBuyStock(
       " : setInitBuyStock insertStockToDb",
     insertStockToDb
   );
-
-  return insertStockToDb;
 
   let err, getInitBuyStockData, initBuyStock;
 
@@ -967,23 +965,23 @@ async function main(
 ) {
   let mainExec = [];
 
-  // if (settings.is_sell_by_time == "true") {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == true)
-  //   mainExec[0] = await automationInitBuys(
-  //     page,
-  //     robot_id,
-  //     dataInitBuyStock,
-  //     user_id
-  //   );
-  // } else {
-  //   // AUTOMATION INITIATION BUY (is_sell_by_time == false)
-  //   mainExec[0] = await automationInitBuysSellTimeFalse(
-  //     page,
-  //     robot_id,
-  //     dataInitBuyStock,
-  //     user_id
-  //   );
-  // }
+  if (settings.is_sell_by_time == "true") {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == true)
+    mainExec[0] = await automationInitBuys(
+      page,
+      robot_id,
+      dataInitBuyStock,
+      user_id
+    );
+  } else {
+    // AUTOMATION INITIATION BUY (is_sell_by_time == false)
+    mainExec[0] = await automationInitBuysSellTimeFalse(
+      page,
+      robot_id,
+      dataInitBuyStock,
+      user_id
+    );
+  }
 
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -1110,14 +1108,14 @@ async function automation(
           }
 
           // AUTOMATION SELL
-          // if (matchStockBuy.length > 0) {
-          //   await automationSells(page, matchStockBuy, robot_id, user_id);
-          // }
+          if (matchStockBuy.length > 0) {
+            await automationSells(page, matchStockBuy, robot_id, user_id);
+          }
 
           // AUTOMATION BUY
-          // if (matchStockSell.length > 0) {
-          //   await automationBuys(page, matchStockSell, robot_id, user_id);
-          // }
+          if (matchStockSell.length > 0) {
+            await automationBuys(page, matchStockSell, robot_id, user_id);
+          }
 
           // SELL BY TIME (ON)
           if (eval("gData.is_sell_by_time" + robot_id) == "true") {
