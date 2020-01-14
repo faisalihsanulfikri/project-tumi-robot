@@ -566,7 +566,9 @@ module.exports.run = async function(req, res) {
             price_type,
             stock_value_data,
             stock_mode_id,
-            robot_id
+            robot_id,
+            settings,
+            user_id
           );
 
           console.log(
@@ -684,48 +686,112 @@ async function getInitBuyDataStock(
   price_type,
   stock_value_data,
   stock_mode_id,
-  robot_id
+  robot_id,
+  settings,
+  user_id
 ) {
+  // id stock all (for custom) = okjz6if
   let stockFromSheet = await getStockFromSheet(stock_mode_id);
 
   let initBuyDataStock = [];
   let insertStockToDb = [];
   let filterStockFromSheet = [];
 
-  stock_value_data.forEach(el => {
-    filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
+  let stockMode = settings.stock_mode;
+  let maxStock = parseInt(settings.max_stock);
+  let minValue = parseInt(settings.min_value);
+  let stockValue = "";
+  let separator = ",";
+
+  console.log("stockFromSheet = ", stockFromSheet);
+  console.log("settings = ", settings);
+
+  // Stock Criteria is not Custom
+  if (stockMode != "okjz6if") {
+    filterStockFromSheet = stockFromSheet
+      .filter(el => {
+        let stockValue = parseInt(el.value.replace(/\./g, ""));
+        return minValue <= stockValue;
+      })
+      .splice(0, maxStock);
 
     if (filterStockFromSheet.length > 0) {
-      let stock = filterStockFromSheet[0].stock;
-      let price = "";
+      filterStockFromSheet.forEach(sfs => {
+        let stock = sfs.stock;
+        let price = "";
 
-      if (price_type == "open") {
-        price = filterStockFromSheet[0].open.replace(".", "");
-      }
-      if (price_type == "close") {
-        price = filterStockFromSheet[0].close.replace(".", "");
-      }
-      if (price_type == "prev") {
-        price = filterStockFromSheet[0].prev_close.replace(".", "");
-      }
+        if (price_type == "open") {
+          price = sfs.open.replace(".", "");
+        }
+        if (price_type == "close") {
+          price = sfs.close.replace(".", "");
+        }
+        if (price_type == "prev") {
+          price = sfs.prev_close.replace(".", "");
+        }
 
-      initBuyDataStock.push({
-        stock,
-        price_type,
-        price: price
+        stockValue = stockValue.concat(stock);
+        stockValue = stockValue.concat(separator);
+
+        initBuyDataStock.push({
+          stock,
+          price_type,
+          price: price
+        });
       });
+
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : initBuyDataStock",
+        initBuyDataStock
+      );
+
+      settings.stock_value = stockValue.slice(0, -1);
+
+      await setSettings(user_id, settings);
+
+      return initBuyDataStock;
     }
-  });
+    //
+  } else {
+    // Stock Criteria is Custom
+    stock_value_data.forEach(el => {
+      filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
 
-  console.log(
-    moment().format("YYYY-MM-DD HH:mm:ss") +
-      " Robot " +
-      robot_id +
-      " : initBuyDataStock",
-    initBuyDataStock
-  );
+      if (filterStockFromSheet.length > 0) {
+        let stock = filterStockFromSheet[0].stock;
+        let price = "";
 
-  return initBuyDataStock;
+        if (price_type == "open") {
+          price = filterStockFromSheet[0].open.replace(".", "");
+        }
+        if (price_type == "close") {
+          price = filterStockFromSheet[0].close.replace(".", "");
+        }
+        if (price_type == "prev") {
+          price = filterStockFromSheet[0].prev_close.replace(".", "");
+        }
+
+        initBuyDataStock.push({
+          stock,
+          price_type,
+          price: price
+        });
+      }
+    });
+
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : initBuyDataStock",
+      initBuyDataStock
+    );
+
+    return initBuyDataStock;
+  }
 }
 
 // get init buy data which has prepare for execute initiation buy
