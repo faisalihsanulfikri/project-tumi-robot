@@ -562,7 +562,7 @@ module.exports.run = async function(req, res) {
             stock_mode_id = "okjz6if";
           }
 
-          let initBuyDataStock = await getInitBuyDataStock(
+          let initBuyData = await getInitBuyDataStock(
             price_type,
             stock_value_data,
             stock_mode_id,
@@ -576,11 +576,11 @@ module.exports.run = async function(req, res) {
               " Robot " +
               robot_id +
               " : isMoreThanBuyTime",
-            initBuyDataStock
+            initBuyData
           );
 
           let dataInitBuyStock = await setInitBuyStock(
-            initBuyDataStock,
+            initBuyData,
             user_id,
             dana_per_stock,
             level_per_stock,
@@ -692,6 +692,7 @@ async function getInitBuyDataStock(
 ) {
   // id stock all (for custom) = okjz6if
   let stockFromSheet = await getStockFromSheet(stock_mode_id);
+  let currentBuyStock = await getInitBuyStock(user_id);
 
   let initBuyDataStock = [];
   let insertStockToDb = [];
@@ -703,83 +704,33 @@ async function getInitBuyDataStock(
   let stockValue = "";
   let separator = ",";
 
+  let isCurrentBuyStock = false;
+
   console.log("stockFromSheet = ", stockFromSheet);
   console.log("settings = ", settings);
 
-  // Stock Criteria is not Custom
-  if (stockMode != "okjz6if") {
-    filterStockFromSheet = stockFromSheet
-      .filter(el => {
-        let stockValue = parseInt(el.value.replace(/\./g, ""));
-        return minValue <= stockValue;
-      })
-      .splice(0, maxStock);
+  // Check For Stock
+  // current stock is exists
+  if (currentBuyStock.length > 0) {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : getInitBuyDataStock currentBuyStock.length = ",
+      currentBuyStock.length
+    );
 
-    if (filterStockFromSheet.length > 0) {
-      filterStockFromSheet.forEach(sfs => {
-        let stock = sfs.stock;
-        let price = "";
+    // trigger current buy stock is exists
+    isCurrentBuyStock = true;
 
-        if (price_type == "open") {
-          price = sfs.open.replace(".", "");
-        }
-        if (price_type == "close") {
-          price = sfs.close.replace(".", "");
-        }
-        if (price_type == "prev") {
-          price = sfs.prev_close.replace(".", "");
-        }
-
-        stockValue = stockValue.concat(stock);
-        stockValue = stockValue.concat(separator);
-
-        initBuyDataStock.push({
-          stock,
-          price_type,
-          price: price
-        });
+    currentBuyStock.forEach(cbs => {
+      initBuyDataStock.push({
+        user_id: user_id,
+        stock: cbs.stock,
+        mode: cbs.mode,
+        price: cbs.price,
+        lots: cbs.lots
       });
-
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : initBuyDataStock",
-        initBuyDataStock
-      );
-
-      settings.stock_value = stockValue.slice(0, -1);
-
-      await setSettings(user_id, settings);
-
-      return initBuyDataStock;
-    }
-    //
-  } else {
-    // Stock Criteria is Custom
-    stock_value_data.forEach(el => {
-      filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
-
-      if (filterStockFromSheet.length > 0) {
-        let stock = filterStockFromSheet[0].stock;
-        let price = "";
-
-        if (price_type == "open") {
-          price = filterStockFromSheet[0].open.replace(".", "");
-        }
-        if (price_type == "close") {
-          price = filterStockFromSheet[0].close.replace(".", "");
-        }
-        if (price_type == "prev") {
-          price = filterStockFromSheet[0].prev_close.replace(".", "");
-        }
-
-        initBuyDataStock.push({
-          stock,
-          price_type,
-          price: price
-        });
-      }
     });
 
     console.log(
@@ -790,13 +741,116 @@ async function getInitBuyDataStock(
       initBuyDataStock
     );
 
-    return initBuyDataStock;
+    return (data = {
+      initBuyDataStock,
+      isCurrentBuyStock
+    });
+  } else {
+    // current stock not exists
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : getInitBuyDataStock currentBuyStock.length = ",
+      currentBuyStock.length
+    );
+    // Stock Criteria is not Custom
+    if (stockMode != "okjz6if") {
+      filterStockFromSheet = stockFromSheet
+        .filter(el => {
+          let stockValue = parseInt(el.value.replace(/\./g, ""));
+          return minValue <= stockValue;
+        })
+        .splice(0, maxStock);
+
+      if (filterStockFromSheet.length > 0) {
+        filterStockFromSheet.forEach(sfs => {
+          let stock = sfs.stock;
+          let price = "";
+
+          if (price_type == "open") {
+            price = sfs.open.replace(".", "");
+          }
+          if (price_type == "close") {
+            price = sfs.close.replace(".", "");
+          }
+          if (price_type == "prev") {
+            price = sfs.prev_close.replace(".", "");
+          }
+
+          stockValue = stockValue.concat(stock);
+          stockValue = stockValue.concat(separator);
+
+          initBuyDataStock.push({
+            stock,
+            price_type,
+            price: price
+          });
+        });
+
+        console.log(
+          moment().format("YYYY-MM-DD HH:mm:ss") +
+            " Robot " +
+            robot_id +
+            " : initBuyDataStock",
+          initBuyDataStock
+        );
+
+        settings.stock_value = stockValue.slice(0, -1);
+
+        await setSettings(user_id, settings);
+
+        return (data = {
+          initBuyDataStock,
+          isCurrentBuyStock
+        });
+      }
+    } else {
+      // Stock Criteria is Custom
+      stock_value_data.forEach(el => {
+        filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
+
+        if (filterStockFromSheet.length > 0) {
+          let stock = filterStockFromSheet[0].stock;
+          let price = "";
+
+          if (price_type == "open") {
+            price = filterStockFromSheet[0].open.replace(".", "");
+          }
+          if (price_type == "close") {
+            price = filterStockFromSheet[0].close.replace(".", "");
+          }
+          if (price_type == "prev") {
+            price = filterStockFromSheet[0].prev_close.replace(".", "");
+          }
+
+          initBuyDataStock.push({
+            stock,
+            price_type,
+            price: price
+          });
+        }
+      });
+
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : initBuyDataStock",
+        initBuyDataStock
+      );
+
+      return (data = {
+        initBuyDataStock,
+        isCurrentBuyStock
+      });
+    }
   }
 }
 
 // get init buy data which has prepare for execute initiation buy
 async function setInitBuyStock(
-  initBuyDataStock,
+  initBuyData,
   user_id,
   stockBudget,
   level_per_stock,
@@ -804,6 +858,9 @@ async function setInitBuyStock(
   robot_id
 ) {
   let currentBuyStock = await getInitBuyStock(user_id);
+
+  let initBuyDataStock = initBuyData.initBuyDataStock;
+  let isCurrentBuyStock = initBuyData.isCurrentBuyStock;
 
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -827,23 +884,38 @@ async function setInitBuyStock(
   let level = level_per_stock;
   let insertStockToDb = [];
 
-  for (let i = 0; i < initBuyDataStock.length; i++) {
-    let stock = initBuyDataStock[i].stock;
-    let priceData = initBuyDataStock[i].price;
-
-    let price = await getBuyPrice(level, spreadPerLevel, priceData);
-
-    for (let idx = 0; idx < level; idx++) {
-      let lots = await getLot(stockBudget, level, price[idx], robot_id);
-
+  // current buy stock is exists
+  if (isCurrentBuyStock == true) {
+    initBuyDataStock.forEach(ibds => {
       insertStockToDb.push({
-        user_id: user_id,
+        user_id: ibds.user_id,
         order_date: now,
-        stock,
+        stock: ibds.stock,
         mode: "Buy",
-        price: price[idx],
-        lots
+        price: ibds.price.toString(),
+        lots: ibds.lots.toString()
       });
+    });
+  } else {
+    // current buy stock is not exists
+    for (let i = 0; i < initBuyDataStock.length; i++) {
+      let stock = initBuyDataStock[i].stock;
+      let priceData = initBuyDataStock[i].price;
+
+      let price = await getBuyPrice(level, spreadPerLevel, priceData);
+
+      for (let idx = 0; idx < level; idx++) {
+        let lots = await getLot(stockBudget, level, price[idx], robot_id);
+
+        insertStockToDb.push({
+          user_id: user_id,
+          order_date: now,
+          stock,
+          mode: "Buy",
+          price: price[idx],
+          lots
+        });
+      }
     }
   }
 
@@ -947,7 +1019,6 @@ async function getInitBuyStock(user_id) {
     })
   );
 
-  console.log("initBuyStock = ", initBuyStock);
   return initBuyStock;
 }
 
