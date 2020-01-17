@@ -1358,7 +1358,8 @@ async function automation(
 
               Promise.all(exec).then(() => {
                 console.log(
-                  "Robot " +
+                  moment().format("YYYY-MM-DD HH:mm:ss") +
+                    " Robot " +
                     robot_id +
                     " : setInitBuySell setTransactionData setOffRobotStatus finish!!!"
                 );
@@ -3539,6 +3540,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
       let spread = 0;
 
       let price = el.price.replace(",", "");
+      let lots = el.lots.replace(",", "");
 
       spread = await getSpread(price, spreadPerLevel);
 
@@ -3549,7 +3551,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           user_id: user_id,
           stock: el.stock,
           mode: el.mode,
-          lots: el.lots,
+          lots: lots,
           status: el.status,
           price: price,
           createdAt: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -3566,7 +3568,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           user_id: user_id,
           stock: el.stock,
           mode: el.mode,
-          lots: el.lots,
+          lots: lots,
           status: el.status,
           priceBuy: price,
           priceSell: (parseInt(price) + spread).toString(),
@@ -3582,7 +3584,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           user_id: user_id,
           stock: el.stock,
           mode: el.mode,
-          lots: el.lots,
+          lots: lots,
           status: el.status,
           priceBuy: price,
           priceSell: (parseInt(price) + spread).toString(),
@@ -3600,7 +3602,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           user_id: user_id,
           stock: el.stock,
           mode: el.mode,
-          lots: el.lots,
+          lots: lots,
           status: el.status,
           priceBuy: (parseInt(price) - spread).toString(),
           priceSell: price,
@@ -3616,7 +3618,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
           user_id: user_id,
           stock: el.stock,
           mode: el.mode,
-          lots: el.lots,
+          lots: lots,
           status: el.status,
           priceBuy: (parseInt(price) - spread).toString(),
           priceSell: price,
@@ -3669,9 +3671,17 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 }
 
 // set last init sell by time off
-async function setInitBuySell(page, user_id) {
+async function setInitBuySell(page, user_id, robot_id) {
   let now = moment().format("YYYY-MM-DD HH:mm:ss");
   let transaction = await getTransaction(page);
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : transaction data on setInitBuySell",
+    transaction
+  );
 
   let filterInit = await transaction.filter(el => {
     return el.status == "Open";
@@ -3681,14 +3691,17 @@ async function setInitBuySell(page, user_id) {
     filterInit.forEach(async el => {
       let orderDate = moment().format("YYYY-MM-DD");
       let orderDateTime = orderDate + " " + el.order_time;
+      let price = el.price.replace(",", "");
+      let lots = el.lots.replace(",", "");
+
       let data = {
         user_id: user_id,
         order_date: orderDateTime,
         stock: el.stock,
-        price: el.price,
+        price: price,
         mode: el.mode,
         updatedAt: now,
-        lots: el.lots
+        lots: lots
       };
       [err, initBuy] = await to(Init_Buy.create(data));
     });
