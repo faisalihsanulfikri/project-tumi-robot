@@ -3424,7 +3424,13 @@ async function automationTransaction(pageT, user_id, robot_id) {
     await pageT.waitFor(3000);
 
     getDataTransaction.forEach(async el => {
+      let price = el.price.replace(",", "");
+      let lots = el.lots.replace(",", "");
+
       el.user_id = user_id;
+      el.price = price;
+      el.lots = lots;
+
       [err, transaction] = await to(Transaction.create(el));
       console.log(
         moment().format("YYYY-MM-DD HH:mm:ss") +
