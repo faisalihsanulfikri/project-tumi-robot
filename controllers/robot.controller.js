@@ -2357,54 +2357,81 @@ async function stockBuy(page, dataStockBuy, robot_id) {
 }
 
 // get transactions
-async function getTransaction(page) {
-  await page.goto(
-    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp"
+async function getTransaction(page, robot_id) {
+  let URL_orderstatus =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp";
+
+  await page.goto(URL_orderstatus);
+
+  await page.once("load", () =>
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Page Transaction Loaded!"
+    )
   );
 
-  await page.waitFor(1000);
+  let url = await page.url();
 
-  try {
-    await page.waitFor(1000);
-    const data = await page.evaluate(() => {
-      return new Promise((resolve, reject) => {
-        let table = document.querySelector("#_orderTable");
-        let row = table.children;
-        let items = [];
+  if (url == URL_orderstatus) {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Transaction URL",
+      url
+    );
+    try {
+      await page.waitFor(1000);
+      const data = await page.evaluate(() => {
+        return new Promise((resolve, reject) => {
+          let table = document.querySelector("#_orderTable");
+          let row = table.children;
+          let items = [];
 
-        for (let index = 0; index < row.length; index++) {
-          let result = {};
+          for (let index = 0; index < row.length; index++) {
+            let result = {};
 
-          for (let i = 0; i < row[index].cells.length; i++) {
-            result["order_time"] = row[index].cells[1].textContent;
-            result["order_id"] = row[index].cells[2].textContent;
-            result["market"] = row[index].cells[3].textContent;
-            result["mode"] = row[index].cells[4].textContent;
-            result["stock"] = row[index].cells[5].textContent;
-            result["price"] = row[index].cells[6].textContent;
-            result["remain"] = row[index].cells[7].textContent;
-            result["match"] = row[index].cells[8].textContent;
-            result["status"] = row[index].cells[9].textContent;
-            if (result["status"] == "Open") {
-              result["lots"] = result["remain"];
-            } else if (result["status"] == "Matched") {
-              result["lots"] = result["match"];
+            for (let i = 0; i < row[index].cells.length; i++) {
+              result["order_time"] = row[index].cells[1].textContent;
+              result["order_id"] = row[index].cells[2].textContent;
+              result["market"] = row[index].cells[3].textContent;
+              result["mode"] = row[index].cells[4].textContent;
+              result["stock"] = row[index].cells[5].textContent;
+              result["price"] = row[index].cells[6].textContent;
+              result["remain"] = row[index].cells[7].textContent;
+              result["match"] = row[index].cells[8].textContent;
+              result["status"] = row[index].cells[9].textContent;
+              if (result["status"] == "Open") {
+                result["lots"] = result["remain"];
+              } else if (result["status"] == "Matched") {
+                result["lots"] = result["match"];
+              }
+              result["order_amount"] = row[index].cells[10].textContent;
+              result["match_amount"] = row[index].cells[11].textContent;
+              result["validity"] = row[index].cells[12].textContent;
+              result["channel"] = row[index].cells[13].textContent;
             }
-            result["order_amount"] = row[index].cells[10].textContent;
-            result["match_amount"] = row[index].cells[11].textContent;
-            result["validity"] = row[index].cells[12].textContent;
-            result["channel"] = row[index].cells[13].textContent;
+
+            items.push(result);
           }
 
-          items.push(result);
-        }
-
-        resolve(items);
+          resolve(items);
+        });
       });
-    });
-    return data;
-  } catch (err) {
-    return err;
+      return data;
+    } catch (err) {
+      return [];
+    }
+  } else {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Transaction URL",
+      url
+    );
   }
 }
 
@@ -3246,78 +3273,113 @@ async function updateWithdrawData(requrstWithdraw) {
 }
 
 // get portofolio rhb
-async function getPortofolioRhb(pagePF, URL_protofolio) {
+async function getPortofolioRhb(pagePF, URL_protofolio, robot_id) {
   await pagePF.goto(URL_protofolio);
-  await pagePF.waitFor(2000);
-
-  const headData = {};
-
-  let startingBalance = await pagePF.evaluate(
-    () => document.querySelector("div[id='_startingBalance']").innerHTML
+  
+  await pagePF.once("load", () =>
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Page Protofolio Loaded!"
+    )
   );
-  await pagePF.waitFor(1000);
 
-  let availableLimit = await pagePF.evaluate(
-    () => document.querySelector("div[id='_availableLimit']").innerHTML
-  );
-  await pagePF.waitFor(1000);
+  let url = await pagePF.url();
 
-  let fundingAvailable = await pagePF.evaluate(
-    () => document.querySelector("div[id='_fundingAvailable']").innerHTML
-  );
-  await pagePF.waitFor(1000);
+  if (url == URL_protofolio) {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Protofolio URL",
+      url
+    );
+    const headData = {};
 
-  let totalAsset = await pagePF.evaluate(
-    () => document.querySelector("div[id='_totalAsset']").innerHTML
-  );
-  await pagePF.waitFor(1000);
+    let startingBalance = await pagePF.evaluate(
+      () => document.querySelector("div[id='_startingBalance']").innerHTML
+    );
+    await pagePF.waitFor(1000);
 
-  let cashRdn = await pagePF.evaluate(
-    () => document.querySelector("div[id='_cashRdn']").innerHTML
-  );
-  await pagePF.waitFor(1000);
-  const item = [];
+    let availableLimit = await pagePF.evaluate(
+      () => document.querySelector("div[id='_availableLimit']").innerHTML
+    );
+    await pagePF.waitFor(1000);
 
-  (headData["starting_balance"] = await startingBalance.replace(/,\s*/g, "")),
-    (headData["available_limit"] = await availableLimit.replace(/,\s*/g, "")),
-    (headData["funding_available"] = await fundingAvailable.replace(
-      /,\s*/g,
-      ""
-    )),
-    (headData["total_asset"] = await totalAsset.replace(/,\s*/g, "")),
-    (headData["cash_in_rdn"] = await cashRdn.replace(/,\s*/g, "")),
-    item.push(headData);
+    let fundingAvailable = await pagePF.evaluate(
+      () => document.querySelector("div[id='_fundingAvailable']").innerHTML
+    );
+    await pagePF.waitFor(1000);
 
-  await pagePF.waitFor(1000);
-  const table = await pagePF.evaluate(() => {
-    return new Promise((resolve, reject) => {
-      let table = document.querySelector("#_portfolio");
-      let row = table.children;
-      let items = [];
-      let length = [];
-      length = row.length - 1;
+    let totalAsset = await pagePF.evaluate(
+      () => document.querySelector("div[id='_totalAsset']").innerHTML
+    );
+    await pagePF.waitFor(1000);
 
-      for (let i = 0; i < length; i++) {
-        let result = {};
-        const tr = row[i];
-        const text = tr.children;
-        if (!text[i]) {
-        } else {
-          result["stock"] = text[0].textContent;
-          (result["avg_buy"] = text[1].textContent.replace(/,\s*/g, "")),
-            (result["last"] = text[2].textContent);
-          (result["gross_value"] = text[6].textContent.replace(/,\s*/g, "")),
-            (result["market_value"] = text[7].textContent.replace(/,\s*/g, "")),
-            (result["pl_price"] = text[10].textContent.replace(/,\s*/g, "")),
-            (result["pl_percent"] = text[11].textContent.replace(/,\s*/g, "")),
-            items.push(result);
+    let cashRdn = await pagePF.evaluate(
+      () => document.querySelector("div[id='_cashRdn']").innerHTML
+    );
+    await pagePF.waitFor(1000);
+    const item = [];
+
+    (headData["starting_balance"] = await startingBalance.replace(/,\s*/g, "")),
+      (headData["available_limit"] = await availableLimit.replace(/,\s*/g, "")),
+      (headData["funding_available"] = await fundingAvailable.replace(
+        /,\s*/g,
+        ""
+      )),
+      (headData["total_asset"] = await totalAsset.replace(/,\s*/g, "")),
+      (headData["cash_in_rdn"] = await cashRdn.replace(/,\s*/g, "")),
+      item.push(headData);
+
+    await pagePF.waitFor(1000);
+    const table = await pagePF.evaluate(() => {
+      return new Promise((resolve, reject) => {
+        let table = document.querySelector("#_portfolio");
+        let row = table.children;
+        let items = [];
+        let length = [];
+        length = row.length - 1;
+
+        for (let i = 0; i < length; i++) {
+          let result = {};
+          const tr = row[i];
+          const text = tr.children;
+          if (!text[i]) {
+          } else {
+            result["stock"] = text[0].textContent;
+            (result["avg_buy"] = text[1].textContent.replace(/,\s*/g, "")),
+              (result["last"] = text[2].textContent);
+            (result["gross_value"] = text[6].textContent.replace(/,\s*/g, "")),
+              (result["market_value"] = text[7].textContent.replace(
+                /,\s*/g,
+                ""
+              )),
+              (result["pl_price"] = text[10].textContent.replace(/,\s*/g, "")),
+              (result["pl_percent"] = text[11].textContent.replace(
+                /,\s*/g,
+                ""
+              )),
+              items.push(result);
+          }
         }
-      }
-      resolve(items);
+        resolve(items);
+      });
     });
-  });
 
-  return { item, table };
+    return { item, table };
+  } else {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : Protofolio URL",
+      url
+    );
+  }
+
+  
 }
 
 // set protofolio data
@@ -3372,7 +3434,7 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
 async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
   let exec = [];
 
-  exec[0] = await getPortofolioRhb(pagePF, URL_protofolio);
+  exec[0] = await getPortofolioRhb(pagePF, URL_protofolio, robot_id);
   exec[1] = await pagePF.waitFor(1000);
   exec[2] = await console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -3398,7 +3460,7 @@ async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
 
 // automation transaction
 async function automationTransaction(pageT, user_id, robot_id) {
-  let getDataTransaction = await getTransaction(pageT);
+  let getDataTransaction = await getTransaction(pageT, robot_id);
 
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -3520,7 +3582,7 @@ async function getLastInitBuysSells(user_id) {
 
 // set transaction
 async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
-  let getDataTransaction = await getTransaction(pageTrx);
+  let getDataTransaction = await getTransaction(pageTrx, robot_id);
 
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
@@ -3679,7 +3741,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
 // set last init sell by time off
 async function setInitBuySell(page, user_id, robot_id) {
   let now = moment().format("YYYY-MM-DD HH:mm:ss");
-  let transaction = await getTransaction(page);
+  let transaction = await getTransaction(page, robot_id);
 
   console.log(
     moment().format("YYYY-MM-DD HH:mm:ss") +
