@@ -1363,7 +1363,7 @@ async function automation(
 
   // initiation buy success
   if (eval("gData.thisInitBuy" + robot_id) == true) {
-    // main job
+    // MAIN JOB
     const job = new CronJob("*/120 * * * * *", async function() {
       let time = moment().format("HH:mm:ss");
       let rest = await getRestTime(time);
@@ -1474,16 +1474,10 @@ async function automation(
                   openStock,
                   robot_id
                 );
-                execSellTimeTrue[1] = await page.waitFor(5000);
-                execSellTimeTrue[2] = await automationTransaction(
-                  pageTrx,
-                  user_id,
-                  robot_id
-                );
+                execSellTimeTrue[1] = await page.waitFor(10000);
+                execSellTimeTrue[2] = await setOffRobotStatus(robot_id, msg);
                 execSellTimeTrue[3] = await page.waitFor(5000);
-                execSellTimeTrue[4] = await setOffRobotStatus(robot_id, msg);
-                execSellTimeTrue[5] = await page.waitFor(5000);
-                execSellTimeTrue[6] = await browser.close();
+                execSellTimeTrue[4] = await browser.close();
                 Promise.all(execSellTimeTrue).then(() => {
                   console.log(
                     "Robot " +
@@ -1533,17 +1527,11 @@ async function automation(
                   "Robot telah selesai dengan close time (sell by time no).";
                 let exec = [];
 
-                exec[0] = await setInitBuySell(page, user_id);
-                exec[1] = await page.waitFor(5000);
-                exec[2] = await automationTransaction(
-                  pageTrx,
-                  user_id,
-                  robot_id
-                );
+                exec[0] = await setInitBuySell(pageTrx, user_id, robot_id);
+                exec[1] = await pageTrx.waitFor(5000);
+                exec[2] = await setOffRobotStatus(robot_id, msg);
                 exec[3] = await page.waitFor(5000);
-                exec[4] = await setOffRobotStatus(robot_id, msg);
-                exec[5] = await page.waitFor(5000);
-                exec[6] = await browser.close();
+                exec[4] = await browser.close();
 
                 Promise.all(exec).then(() => {
                   console.log(
@@ -2573,7 +2561,7 @@ async function getTransaction(page, robot_id) {
       url
     );
     try {
-      await page.waitFor(1000);
+      await page.waitFor(5000);
       const data = await page.evaluate(() => {
         return new Promise((resolve, reject) => {
           let table = document.querySelector("#_orderTable");
@@ -3658,7 +3646,7 @@ async function automationTransaction(pageT, user_id, robot_id) {
     getDataTransaction
   );
 
-  await pageT.waitFor(5000);
+  await pageT.waitFor(3000);
 
   if (getDataTransaction.length > 0) {
     [err, Datatransaction] = await to(
@@ -3780,7 +3768,7 @@ async function setTransactionData(pageTrx, user_id, spreadPerLevel, robot_id) {
     getDataTransaction
   );
 
-  await pageTrx.waitFor(4000);
+  await pageTrx.waitFor(3000);
 
   let dataStock = {};
   let openStockBuy = [];
@@ -3938,6 +3926,8 @@ async function setInitBuySell(page, user_id, robot_id) {
       " : transaction data on setInitBuySell",
     transaction
   );
+
+  await page.waitFor(3000);
 
   let filterInit = await transaction.filter(el => {
     return el.status == "Open";
