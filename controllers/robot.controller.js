@@ -53,6 +53,7 @@ module.exports.run = async function(req, res) {
   eval("gData.getSellTime" + robot_id + "= '';");
   eval("gData.is_sell_by_time" + robot_id + "= '';");
   eval("gData.index" + robot_id + "= 0;");
+  eval("gData.errMsg" + robot_id + "= 'Gagal terhubung dengan RHB';");
 
   console.log("Global Data Robot " + robot_id + " = ", gData);
 
@@ -355,7 +356,7 @@ module.exports.run = async function(req, res) {
           );
           jobSecondaryT.stop();
 
-          let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+          let msg = eval("gData.errMsg" + robot_id);
           await closeErrorRobot(res, browser, msg, robot_id);
         }
       }
@@ -467,7 +468,8 @@ module.exports.run = async function(req, res) {
               " : runSecondaryJob jobSecondary Portfolio stop()"
           );
           jobSecondaryP.stop();
-          let msg = "Terindikasi double login atau Gagal terhubung dengan RHB";
+
+          let msg = eval("gData.errMsg" + robot_id);
           await closeErrorRobot(res, browser, msg, robot_id);
         }
       }
@@ -1567,9 +1569,9 @@ async function automation(
             );
 
             job.stop();
-            let thisMessage =
-              "Terindikasi double login atau Gagal terhubung dengan RHB";
-            await closeErrorRobot(res, browser, thisMessage, robot_id);
+
+            let msg = eval("gData.errMsg" + robot_id);
+            await closeErrorRobot(res, browser, msg, robot_id);
           }
         } else {
           console.log(
@@ -2610,6 +2612,8 @@ async function getTransaction(page, robot_id) {
         " : Transaction URL",
       url
     );
+
+    eval("gData.errMsg" + robot_id + "= 'Terindikasi double login';");
   }
 }
 
@@ -3555,6 +3559,8 @@ async function getPortofolioRhb(pagePF, URL_protofolio, robot_id) {
         " : Protofolio URL",
       url
     );
+
+    eval("gData.errMsg" + robot_id + "= 'Terindikasi double login';");
   }
 }
 
