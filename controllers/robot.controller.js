@@ -359,6 +359,9 @@ module.exports.run = async function(req, res) {
           let msg = eval("gData.errMsg" + robot_id);
           await closeErrorRobot(res, browser, msg, robot_id);
         }
+      } else {
+        // Refresh Page
+        await refreshPageTransaction(pageT, robot_id);
       }
     });
 
@@ -472,6 +475,9 @@ module.exports.run = async function(req, res) {
           let msg = eval("gData.errMsg" + robot_id);
           await closeErrorRobot(res, browser, msg, robot_id);
         }
+      } else {
+        // Refresh Page
+        await refreshPagePortofolio(pagePF, URL_protofolio, robot_id);
       }
     });
 
@@ -555,6 +561,9 @@ module.exports.run = async function(req, res) {
           );
           jobSecondarySR.stop();
         }
+      } else {
+        // Refresh Page
+        await refreshPageStockRangking(pageSR, robot_id);
       }
     });
 
@@ -637,6 +646,8 @@ module.exports.run = async function(req, res) {
           );
           jobSecondaryW.stop();
         }
+      } else {
+        await refreshPageWithdraws(pageWd, URL_accountinfo, robot_id);
       }
     });
 
@@ -1582,6 +1593,9 @@ async function automation(
           );
           job.stop();
         }
+      } else {
+        // Refresh Page
+        await refreshPageMainJob(page, pageTrx, URL_runningTrade, robot_id);
       }
     });
 
@@ -2691,29 +2705,6 @@ async function stockRanking(page) {
   return fulldata;
 }
 
-// input stock rangking
-async function inputStockRangking(pageSR) {
-  let stock_rangking, getStockrangking, stock, stock_rangkings, err;
-
-  getStockrangking = await stockRanking(pageSR);
-
-  await pageSR.waitFor(1000);
-
-  Promise.all([
-    ([err, stock_rangkings] = await to(Stock_rangking.findAll({ raw: true }))),
-    stock_rangkings.forEach(async element => {
-      ([err, stock_rangkings] = await to(
-        Stock_rangking.findOne({ where: { id: element.id } })
-      )),
-        ([err, stock_rangkings] = await to(stock_rangkings.destroy()));
-    }),
-
-    getStockrangking.forEach(async el => {
-      [err, stock_rangking] = await to(Stock_rangking.create(el));
-    })
-  ]);
-}
-
 // get Users
 async function getUsers(robot_id) {
   let userData, securityData, robotData;
@@ -3263,30 +3254,6 @@ async function setRobotStatusInitFail(robot_id, message) {
   [err, robot] = await to(robot.save());
 }
 
-// exec withdraw
-async function withdraws(pageWd, URL_accountinfo, robot_id, user_id) {
-  let exec = [];
-
-  exec[0] = await setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id);
-  exec[1] = await pageWd.waitFor(3000);
-  exec[2] = await automationSetWithdrawRhb(
-    pageWd,
-    URL_accountinfo,
-    robot_id,
-    user_id
-  );
-
-  // run withdraw stock
-  Promise.all(exec).then(() => {
-    console.log(
-      moment().format("YYYY-MM-DD HH:mm:ss") +
-        " Robot " +
-        robot_id +
-        " : withdraw Execute"
-    );
-  });
-}
-
 // set withdraw data
 async function setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id) {
   let dataGetWistdraw = await getWithdrawRhb(pageWd, URL_accountinfo, robot_id);
@@ -3612,81 +3579,6 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
   });
 }
 
-// automation protofolio
-async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
-  let exec = [];
-
-  exec[0] = await getPortofolioRhb(pagePF, URL_protofolio, robot_id);
-  exec[1] = await pagePF.waitFor(1000);
-  exec[2] = await console.log(
-    moment().format("YYYY-MM-DD HH:mm:ss") +
-      " : Robot " +
-      robot_id +
-      " : portofolio",
-    await exec[0]
-  );
-  exec[3] = await pagePF.waitFor(1000);
-  exec[4] = await setProtofolioData(pagePF, exec[0], user_id);
-
-  Promise.all(exec).then(() => {
-    console.log(
-      moment().format("YYYY-MM-DD HH:mm:ss") +
-        " : Robot " +
-        robot_id +
-        " : getPortofolioRhb setProtofolioData finish!!!"
-    );
-  });
-
-  return await exec[0];
-}
-
-// automation transaction
-async function automationTransaction(pageT, user_id, robot_id) {
-  let getDataTransaction = await getTransaction(pageT, robot_id);
-
-  console.log(
-    moment().format("YYYY-MM-DD HH:mm:ss") +
-      " Robot " +
-      robot_id +
-      " : automationTransaction",
-    getDataTransaction
-  );
-
-  await pageT.waitFor(3000);
-
-  if (getDataTransaction.length > 0) {
-    [err, Datatransaction] = await to(
-      Transaction.findAll({ where: { user_id: user_id } })
-    );
-
-    if (Datatransaction.length > 0) {
-      Datatransaction.forEach(async elements => {
-        [err, Datatransaction] = await to(elements.destroy());
-      });
-    }
-
-    await pageT.waitFor(3000);
-
-    getDataTransaction.forEach(async el => {
-      let price = el.price.replace(",", "");
-      let lots = el.lots.replace(",", "");
-
-      el.user_id = user_id;
-      el.price = price;
-      el.lots = lots;
-
-      [err, transaction] = await to(Transaction.create(el));
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : Transaction Data",
-        el
-      );
-    });
-  }
-}
-
 // get data if last more than tp or last less than cl
 async function getTpClStock(mapStockOpen, user_id) {
   let dataMapStockOpen = [];
@@ -4003,3 +3895,227 @@ async function closeErrorRobotBeforeLogin(res, browser, msg, robot_id) {
     500
   );
 }
+
+/** AUTOMATION SECONDARY JOB */
+
+// automation transaction
+async function automationTransaction(pageT, user_id, robot_id) {
+  let getDataTransaction = await getTransaction(pageT, robot_id);
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : automationTransaction",
+    getDataTransaction
+  );
+
+  await pageT.waitFor(3000);
+
+  if (getDataTransaction.length > 0) {
+    [err, Datatransaction] = await to(
+      Transaction.findAll({ where: { user_id: user_id } })
+    );
+
+    if (Datatransaction.length > 0) {
+      Datatransaction.forEach(async elements => {
+        [err, Datatransaction] = await to(elements.destroy());
+      });
+    }
+
+    await pageT.waitFor(3000);
+
+    getDataTransaction.forEach(async el => {
+      let price = el.price.replace(",", "");
+      let lots = el.lots.replace(",", "");
+
+      el.user_id = user_id;
+      el.price = price;
+      el.lots = lots;
+
+      [err, transaction] = await to(Transaction.create(el));
+      console.log(
+        moment().format("YYYY-MM-DD HH:mm:ss") +
+          " Robot " +
+          robot_id +
+          " : Transaction Data",
+        el
+      );
+    });
+  }
+}
+
+// automation protofolio
+async function automationPortofolio(pagePF, URL_protofolio, user_id, robot_id) {
+  let exec = [];
+
+  exec[0] = await getPortofolioRhb(pagePF, URL_protofolio, robot_id);
+  exec[1] = await pagePF.waitFor(1000);
+  exec[2] = await console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : portofolio",
+    await exec[0]
+  );
+  exec[3] = await pagePF.waitFor(1000);
+  exec[4] = await setProtofolioData(pagePF, exec[0], user_id);
+
+  Promise.all(exec).then(() => {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : getPortofolioRhb setProtofolioData finish!!!"
+    );
+  });
+
+  return await exec[0];
+}
+
+// input stock rangking
+async function inputStockRangking(pageSR) {
+  let stock_rangking, getStockrangking, stock, stock_rangkings, err;
+
+  getStockrangking = await stockRanking(pageSR);
+
+  await pageSR.waitFor(1000);
+
+  Promise.all([
+    ([err, stock_rangkings] = await to(Stock_rangking.findAll({ raw: true }))),
+    stock_rangkings.forEach(async element => {
+      ([err, stock_rangkings] = await to(
+        Stock_rangking.findOne({ where: { id: element.id } })
+      )),
+        ([err, stock_rangkings] = await to(stock_rangkings.destroy()));
+    }),
+
+    getStockrangking.forEach(async el => {
+      [err, stock_rangking] = await to(Stock_rangking.create(el));
+    })
+  ]);
+}
+
+// exec withdraw
+async function withdraws(pageWd, URL_accountinfo, robot_id, user_id) {
+  let exec = [];
+
+  exec[0] = await setWithdrawData(pageWd, URL_accountinfo, robot_id, user_id);
+  exec[1] = await pageWd.waitFor(3000);
+  exec[2] = await automationSetWithdrawRhb(
+    pageWd,
+    URL_accountinfo,
+    robot_id,
+    user_id
+  );
+
+  // run withdraw stock
+  Promise.all(exec).then(() => {
+    console.log(
+      moment().format("YYYY-MM-DD HH:mm:ss") +
+        " Robot " +
+        robot_id +
+        " : withdraw Execute"
+    );
+  });
+}
+/** END AUTOMATION SECONDARY JOB */
+
+/** REFRESH PAGE SECONDARY JOB*/
+
+// refresh page automation transaction
+async function refreshPageTransaction(pageT, robot_id) {
+  let URL_orderstatus =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp";
+
+  await pageT.goto(URL_orderstatus);
+
+  let url = await pageT.url();
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Transaction URL",
+    url
+  );
+}
+
+// refresh page automation protofolio
+async function refreshPagePortofolio(pagePF, URL_protofolio, robot_id) {
+  await pagePF.goto(URL_protofolio);
+
+  let url = await pagePF.url();
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Portfolio URL",
+    url
+  );
+}
+
+// input stock rangking
+async function refreshPageStockRangking(pageSR, robot_id) {
+  await pageSR.goto(
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/stock_ranking.jsp"
+  );
+
+  let url = await pageSR.url();
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Stock Ranking URL",
+    url
+  );
+}
+
+// refersh page withdraw
+async function refreshPageWithdraws(pageWd, URL_accountinfo, robot_id) {
+  await pageWd.goto(URL_accountinfo);
+
+  let url = await pageWd.url();
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Withdraw URL",
+    url
+  );
+}
+/** END REFRESH PAGE */
+
+/** REFRESH PAGE MAIN JOB */
+
+// refresh page main job (page for data and exec transaction)
+async function refreshPageMainJob(page, pageTrx, URL_runningTrade, robot_id) {
+  let URL_orderstatus =
+    "https://webtrade.rhbtradesmart.co.id/onlineTrading/html/orderstatus.jsp";
+
+  await pageTrx.goto(URL_orderstatus);
+  await page.goto(URL_runningTrade);
+
+  let urlPage = await page.url();
+  let urlpageTrx = await pageTrx.url();
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Running Trade URL",
+    urlPage
+  );
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : Order Status URL",
+    urlpageTrx
+  );
+}
+/** END REFRESH PAGE */
