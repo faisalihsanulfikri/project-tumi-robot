@@ -703,59 +703,99 @@ module.exports.run = async function(req, res) {
         if (now >= buy_time) {
           isMoreThanBuyTime.stop();
 
-          // get all stock for custom
-          if (stock_mode_id == "custom") {
-            stock_mode_id = "okjz6if";
-          }
-
-          let initBuyData = await getInitBuyDataStock(
-            price_type,
-            stock_value_data,
-            stock_mode_id,
-            robot_id,
-            settings,
-            user_id
-          );
+          let lastInit = await getLastInitBuysSells(user_id);
 
           console.log(
             moment().format("YYYY-MM-DD HH:mm:ss") +
               " Robot " +
               robot_id +
-              " : isMoreThanBuyTime",
-            initBuyData
+              " : lastInit length",
+            lastInit.length
           );
 
-          let dataInitBuyStock = await setInitBuyStock(
-            initBuyData,
-            user_id,
-            dana_per_stock,
-            level_per_stock,
-            spreadPerLevel,
-            robot_id
-          );
+          if (lastInit.length == 0) {
+            // lastinit length == 0
+            // get all stock for custom
+            if (stock_mode_id == "custom") {
+              stock_mode_id = "okjz6if";
+            }
 
-          console.log("dataInitBuyStock = ", dataInitBuyStock);
+            let initBuyData = await getInitBuyDataStock(
+              price_type,
+              stock_value_data,
+              stock_mode_id,
+              robot_id,
+              settings,
+              user_id
+            );
 
-          await main(
-            res,
-            page,
-            pageTrx,
-            pagePF,
-            pageSR,
-            pageWd,
-            browser,
-            user_id,
-            settings,
-            robot_id,
-            URL_protofolio,
-            thisUser,
-            URL_accountinfo,
-            spreadPerLevel,
-            clValue,
-            profitPerLevel,
-            dataInitBuyStock,
-            URL_runningTrade
-          );
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : isMoreThanBuyTime",
+              initBuyData
+            );
+
+            let dataInitBuyStock = await setInitBuyStock(
+              initBuyData,
+              user_id,
+              dana_per_stock,
+              level_per_stock,
+              spreadPerLevel,
+              robot_id
+            );
+
+            console.log("dataInitBuyStock = ", dataInitBuyStock);
+
+            await main(
+              res,
+              page,
+              pageTrx,
+              pagePF,
+              pageSR,
+              pageWd,
+              browser,
+              user_id,
+              settings,
+              robot_id,
+              URL_protofolio,
+              thisUser,
+              URL_accountinfo,
+              spreadPerLevel,
+              clValue,
+              profitPerLevel,
+              dataInitBuyStock,
+              URL_runningTrade
+            );
+          } else {
+            // lastinit length > 0
+
+            let dataInitBuyStock = [];
+
+            console.log("dataInitBuyStock = ", dataInitBuyStock);
+
+            await main(
+              res,
+              page,
+              pageTrx,
+              pagePF,
+              pageSR,
+              pageWd,
+              browser,
+              user_id,
+              settings,
+              robot_id,
+              URL_protofolio,
+              thisUser,
+              URL_accountinfo,
+              spreadPerLevel,
+              clValue,
+              profitPerLevel,
+              dataInitBuyStock,
+              URL_runningTrade
+            );
+          }
         }
       } else {
         console.log(
@@ -2269,7 +2309,7 @@ async function stockInitBuySellTimeOff(page, lastInit, robot_id, user_id) {
       " : ##############################################"
   );
 
-  return await page.waitFor(1000);
+  return await page.waitFor(3000);
 }
 
 // set init sell stocks (sell by time == false)
@@ -2325,7 +2365,7 @@ async function stockInitSellSellTimeOff(page, lastInit, robot_id, user_id) {
       " : ##############################################"
   );
 
-  return await page.waitFor(1000);
+  return await page.waitFor(3000);
 }
 
 // set sell stocks
@@ -2597,7 +2637,10 @@ async function getTransaction(page, robot_id) {
               result["remain"] = row[index].cells[7].textContent;
               result["match"] = row[index].cells[8].textContent;
               result["status"] = row[index].cells[9].textContent;
-              if (result["status"] == "Open") {
+              if (
+                result["status"] == "Open" ||
+                result["status"] == "Withdraw"
+              ) {
                 result["lots"] = result["remain"];
               } else if (result["status"] == "Matched") {
                 result["lots"] = result["match"];
