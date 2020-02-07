@@ -3489,6 +3489,7 @@ async function getPortofolioRhb(pagePF, URL_protofolio, robot_id) {
     );
     const headData = {};
 
+    await pagePF.waitFor(1000);
     let startingBalance = await pagePF.evaluate(
       () => document.querySelector("div[id='_startingBalance']").innerHTML
     );
