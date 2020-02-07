@@ -3579,6 +3579,22 @@ async function getPortofolioRhb(pagePF, URL_protofolio, robot_id) {
 async function setProtofolioData(pagePF, getPortofolio, user_id) {
   let lastinsertId;
 
+  // delete portfolio table
+  [err, portofolio_stock] = await to(
+    Portofolio_stocks.findAll({ where: { user_id: user_id } })
+  );
+
+  await pagePF.waitFor(2000);
+
+  if (portofolio_stock.length > 0) {
+    portofolio_stock.forEach(async el => {
+      [err, portofolio_stock] = await to(el.destroy());
+    });
+  }
+
+  await pagePF.waitFor(2000);
+
+  // create or update portfolio item
   getPortofolio.item.forEach(async el => {
     [err, portofolios] = await to(Portofolios.findOne({ where: { user_id } }));
 
@@ -3595,31 +3611,11 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
 
   await pagePF.waitFor(2000);
 
+  // create portfolio table
   getPortofolio.table.forEach(async el => {
-    [err, portofolio_stock] = await to(
-      Portofolio_stocks.findOne({ where: { user_id: user_id } })
-    );
-
     el.portofolio_id = lastinsertId;
     el.user_id = user_id;
-
-    if (!portofolio_stock) {
-      [err, portofolio_stock] = await to(Portofolio_stocks.create(el));
-    } else {
-      Promise.all([
-        ([err, portofolio_stock] = await to(
-          Portofolio_stocks.findAll({ where: { user_id: user_id } })
-        )),
-        portofolio_stock.forEach(async element => {
-          if (element) {
-            ([err, portofolio_stock] = await to(
-              Portofolio_stocks.findOne({ where: { id: element.id } })
-            )),
-              ([err, portofolio_stock] = await to(element.destroy()));
-          }
-        })
-      ])[(err, portofolio_stock)] = await to(Portofolio_stocks.create(el));
-    }
+    [err, portofolio_stock] = await to(Portofolio_stocks.create(el));
   });
 }
 
