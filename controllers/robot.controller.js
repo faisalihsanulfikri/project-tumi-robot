@@ -3586,11 +3586,9 @@ async function setProtofolioData(pagePF, getPortofolio, user_id) {
 
   await pagePF.waitFor(2000);
 
-  if (portofolio_stock.length > 0) {
-    portofolio_stock.forEach(async el => {
-      [err, portofolio_stock] = await to(el.destroy());
-    });
-  }
+  portofolio_stock.forEach(async el => {
+    [err, portofolio_stock] = await to(el.destroy());
+  });
 
   await pagePF.waitFor(2000);
 
