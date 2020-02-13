@@ -188,7 +188,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Time = " +
+          " : Time = " +
           time +
           " Setting"
       );
@@ -196,7 +196,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Rest = " +
+          " : Rest = " +
           rest +
           " Setting"
       );
@@ -278,7 +278,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Time = " +
+          " : Time = " +
           time +
           " Transaction"
       );
@@ -286,7 +286,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Rest = " +
+          " : Rest = " +
           rest +
           " Transaction"
       );
@@ -377,7 +377,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Time = " +
+          " : Time = " +
           time +
           " Portfolio"
       );
@@ -385,7 +385,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Rest = " +
+          " : Rest = " +
           rest +
           " Portfolio"
       );
@@ -493,7 +493,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Time = " +
+          " : Time = " +
           time +
           " Stock Ranking"
       );
@@ -501,7 +501,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Rest = " +
+          " : Rest = " +
           rest +
           " Stock Ranking"
       );
@@ -579,7 +579,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Time = " +
+          " : Time = " +
           time +
           " Withdraw"
       );
@@ -587,7 +587,7 @@ module.exports.run = async function(req, res) {
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Rest = " +
+          " : Rest = " +
           rest +
           " Withdraw"
       );
@@ -664,13 +664,13 @@ module.exports.run = async function(req, res) {
       //   moment().format("YYYY-MM-DD HH:mm:ss") +
       //     " Robot " +
       //     robot_id +
-      //     " Time = " +
+      //     " : Time = " +
       //     time +
       //     " Go to buy time"
       // );
       // console.log(
       //   moment().format("YYYY-MM-DD HH:mm:ss") +
-      //     " Robot " +
+      //     " : Robot " +
       //     robot_id +
       //     " Rest = " +
       //     rest +
@@ -773,7 +773,13 @@ module.exports.run = async function(req, res) {
 
             let dataInitBuyStock = [];
 
-            console.log("dataInitBuyStock = ", dataInitBuyStock);
+            console.log(
+              moment().format("YYYY-MM-DD HH:mm:ss") +
+                " Robot " +
+                robot_id +
+                " : dataInitBuyStock = ",
+              dataInitBuyStock
+            );
 
             await main(
               res,
@@ -923,8 +929,21 @@ async function getInitBuyDataStock(
 
   let isCurrentBuyStock = false;
 
-  console.log("stockFromSheet = ", stockFromSheet);
-  console.log("settings = ", settings);
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : stockFromSheet = ",
+    stockFromSheet
+  );
+
+  console.log(
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : settings = ",
+    settings
+  );
 
   // Check For Stock
   // current stock is exists
@@ -971,38 +990,85 @@ async function getInitBuyDataStock(
         " : getInitBuyDataStock currentBuyStock.length = ",
       currentBuyStock.length
     );
-    // Stock Criteria is not Custom
-    if (stockMode != "okjz6if") {
-      filterStockFromSheet = stockFromSheet
-        .filter(el => {
-          let stockValue = parseInt(el.value.replace(/\./g, ""));
-          return minValue <= stockValue;
-        })
-        .splice(0, maxStock);
 
-      if (filterStockFromSheet.length > 0) {
-        filterStockFromSheet.forEach(sfs => {
-          let stock = sfs.stock;
-          let price = "";
+    // check for data stock length from google spreadsheet > 0
+    if (stockFromSheet.length > 0) {
+      // Stock Criteria is not Custom
+      if (stockMode != "okjz6if") {
+        filterStockFromSheet = stockFromSheet
+          .filter(el => {
+            let stockValue = parseInt(el.value.replace(/\./g, ""));
+            return minValue <= stockValue;
+          })
+          .splice(0, maxStock);
 
-          if (price_type == "open") {
-            price = sfs.open.replace(".", "");
-          }
-          if (price_type == "close") {
-            price = sfs.close.replace(".", "");
-          }
-          if (price_type == "prev") {
-            price = sfs.prev_close.replace(".", "");
-          }
+        if (filterStockFromSheet.length > 0) {
+          filterStockFromSheet.forEach(sfs => {
+            let stock = sfs.stock;
+            let price = "";
 
-          stockValue = stockValue.concat(stock);
-          stockValue = stockValue.concat(separator);
+            if (price_type == "open") {
+              price = sfs.open.replace(".", "");
+            }
+            if (price_type == "close") {
+              price = sfs.close.replace(".", "");
+            }
+            if (price_type == "prev") {
+              price = sfs.prev_close.replace(".", "");
+            }
 
-          initBuyDataStock.push({
-            stock,
-            price_type,
-            price: price
+            stockValue = stockValue.concat(stock);
+            stockValue = stockValue.concat(separator);
+
+            initBuyDataStock.push({
+              stock,
+              price_type,
+              price: price
+            });
           });
+
+          console.log(
+            moment().format("YYYY-MM-DD HH:mm:ss") +
+              " Robot " +
+              robot_id +
+              " : initBuyDataStock",
+            initBuyDataStock
+          );
+
+          settings.stock_value = stockValue.slice(0, -1);
+
+          await setSettings(user_id, settings);
+
+          return (data = {
+            initBuyDataStock,
+            isCurrentBuyStock
+          });
+        }
+      } else {
+        // Stock Criteria is Custom
+        stock_value_data.forEach(el => {
+          filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
+
+          if (filterStockFromSheet.length > 0) {
+            let stock = filterStockFromSheet[0].stock;
+            let price = "";
+
+            if (price_type == "open") {
+              price = filterStockFromSheet[0].open.replace(".", "");
+            }
+            if (price_type == "close") {
+              price = filterStockFromSheet[0].close.replace(".", "");
+            }
+            if (price_type == "prev") {
+              price = filterStockFromSheet[0].prev_close.replace(".", "");
+            }
+
+            initBuyDataStock.push({
+              stock,
+              price_type,
+              price: price
+            });
+          }
         });
 
         console.log(
@@ -1013,50 +1079,13 @@ async function getInitBuyDataStock(
           initBuyDataStock
         );
 
-        settings.stock_value = stockValue.slice(0, -1);
-
-        await setSettings(user_id, settings);
-
         return (data = {
           initBuyDataStock,
           isCurrentBuyStock
         });
       }
     } else {
-      // Stock Criteria is Custom
-      stock_value_data.forEach(el => {
-        filterStockFromSheet = stockFromSheet.filter(sfs => sfs.stock == el);
-
-        if (filterStockFromSheet.length > 0) {
-          let stock = filterStockFromSheet[0].stock;
-          let price = "";
-
-          if (price_type == "open") {
-            price = filterStockFromSheet[0].open.replace(".", "");
-          }
-          if (price_type == "close") {
-            price = filterStockFromSheet[0].close.replace(".", "");
-          }
-          if (price_type == "prev") {
-            price = filterStockFromSheet[0].prev_close.replace(".", "");
-          }
-
-          initBuyDataStock.push({
-            stock,
-            price_type,
-            price: price
-          });
-        }
-      });
-
-      console.log(
-        moment().format("YYYY-MM-DD HH:mm:ss") +
-          " Robot " +
-          robot_id +
-          " : initBuyDataStock",
-        initBuyDataStock
-      );
-
+      // check for data stock length from google spreadsheet == 0
       return (data = {
         initBuyDataStock,
         isCurrentBuyStock
@@ -1425,7 +1454,7 @@ async function automation(
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Time = " +
+          " : Time = " +
           time +
           " Main Job"
       );
@@ -1433,7 +1462,7 @@ async function automation(
         moment().format("YYYY-MM-DD HH:mm:ss") +
           " Robot " +
           robot_id +
-          " Rest = " +
+          " : Rest = " +
           rest +
           " Main Job"
       );
@@ -3671,14 +3700,19 @@ async function getTpClStock(mapStockOpen, user_id) {
 
 // get last init sell
 async function getLastInitBuysSells(user_id) {
-  let lastInitBuy = [];
+  let weekDay = moment().format("dddd");
+  let subDay = 1;
+
+  if (weekDay == "Monday") {
+    subDay = 3;
+  }
 
   let startDate = moment()
-    .subtract(1, "days")
+    .subtract(subDay, "days")
     .format("YYYY-MM-DD 00:00:00");
 
   let EndDate = moment()
-    .subtract(1, "days")
+    .subtract(subDay, "days")
     .format("YYYY-MM-DD 23:59:00");
 
   let err, initBuy;
