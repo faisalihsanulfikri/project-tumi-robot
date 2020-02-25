@@ -1558,7 +1558,7 @@ async function automation(
                 );
                 execSellTimeTrue[1] = await page.waitFor(20000);
                 execSellTimeTrue[2] = await setOffRobotStatus(robot_id, msg);
-                execSellTimeTrue[3] = await page.waitFor(5000);
+                execSellTimeTrue[3] = await page.waitFor(10000);
                 execSellTimeTrue[4] = await browser.close();
                 Promise.all(execSellTimeTrue).then(() => {
                   console.log(
@@ -1612,7 +1612,7 @@ async function automation(
                 exec[0] = await setInitBuySell(pageTrx, user_id, robot_id);
                 exec[1] = await pageTrx.waitFor(20000);
                 exec[2] = await setOffRobotStatus(robot_id, msg);
-                exec[3] = await page.waitFor(5000);
+                exec[3] = await page.waitFor(10000);
                 exec[4] = await browser.close();
 
                 Promise.all(exec).then(() => {
