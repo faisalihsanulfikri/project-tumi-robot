@@ -2476,12 +2476,16 @@ async function stockSellByTime(page, dataStockSell, robot_id) {
 
   await page.type("input[id='_stockCode']", stock);
   await page.keyboard.press(String.fromCharCode(13));
-  await page.waitFor(3000);
+  await page.waitFor(5000);
 
   let bidPrice = await getBidPrice(page);
+  await page.waitFor(2000);
 
   console.log(
-    moment().format("YYYY-MM-DD HH:mm:ss") + " Robot " + robot_id + " : type ",
+    moment().format("YYYY-MM-DD HH:mm:ss") +
+      " Robot " +
+      robot_id +
+      " : bid price ",
     bidPrice
   );
 
